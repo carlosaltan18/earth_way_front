@@ -149,9 +149,9 @@ export default function PostsPage() {
     setFormData({ title: post.title, content: post.content })
   }
 
-  const canEditPost = (post: Post) => {
-    return isAuthenticated && (user?.id === post.authorId || user?.roles.includes("ADMIN"))
-  }
+  const canEditPost = (post: Post) =>
+  isAuthenticated && (user?.id === post.authorId || (user?.roles ?? []).includes("ROLE_ADMIN"));
+
 
   return (
     <Layout>

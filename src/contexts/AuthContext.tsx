@@ -1,203 +1,163 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
+import axios, { AxiosError } from "axios";
+import {jwtDecode} from "jwt-decode";
+import { setAuthToken } from "../lib/axiosClient";
 
-export type UserRole = "ADMIN" | "USER" | "ORGANIZATION"
+export type UserRole = "ROLE_ADMIN" | "ROLE_USER" | "ROLE_ORGANIZATION";
+
+export interface LoginResponse {
+  payload: {
+    token: string;
+    expiresIn: number;
+  };
+  message: string;
+}
 
 export interface User {
-  id: string
-  name: string
-  email: string
-  phone?: string
-  roles: UserRole[]
-  organizationId?: string
-}
-
-// Add new interface for reports
-export interface Report {
-  id: string
-  title: string
-  description: string
-  date: string
-  location: {
-    lat: number
-    lng: number
-    address: string
-  }
-  authorId: string
-  authorName: string
-  done: boolean
-  category: "pollution" | "deforestation" | "wildlife" | "waste"
-}
-
-interface AuthContextType {
-  user: User | null
-  login: (email: string, password: string) => Promise<boolean>
-  register: (userData: RegisterData) => Promise<boolean>
-  logout: () => void
-  hasRole: (role: UserRole) => boolean
-  isAuthenticated: boolean
-  reports: Report[]
-  setReports: React.Dispatch<React.SetStateAction<Report[]>>
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  roles: UserRole[];
+  organizationId?: string;
+  token: string;
 }
 
 interface RegisterData {
-  name: string
-  email: string
-  password: string
-  phone?: string
-  role: UserRole
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  role: UserRole;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+interface JwtPayload {
+  sub: string;
+  roles: { authority: string }[];
+  exp?: number;
+}
 
-// Mock users data
-const mockUsers: (User & { password: string })[] = [
-  {
-    id: "1",
-    name: "Admin Usuario",
-    email: "admin@earthway.com",
-    password: "admin123",
-    phone: "+1234567890",
-    roles: ["ADMIN"],
-  },
-  {
-    id: "2",
-    name: "Usuario Regular",
-    email: "user@earthway.com",
-    password: "user123",
-    phone: "+1234567891",
-    roles: ["USER"],
-  },
-  {
-    id: "3",
-    name: "EcoOrg",
-    email: "org@earthway.com",
-    password: "org123",
-    phone: "+1234567892",
-    roles: ["ORGANIZATION"],
-    organizationId: "1",
-  },
-]
+interface AuthContextType {
+  user: User | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (userData: RegisterData) => Promise<boolean>;
+  logout: () => void;
+  hasRole: (role: UserRole) => boolean;
+  isAuthenticated: boolean;
+}
 
-// Add reports to mock data
-const mockReports: Report[] = [
-  {
-    id: "1",
-    title: "Contaminación Río Rímac",
-    description: "Vertido de residuos industriales detectado en el sector norte del río",
-    date: "2024-01-20",
-    location: {
-      lat: -12.03,
-      lng: -77.08,
-      address: "Río Rímac, Sector Industrial",
-    },
-    authorId: "1",
-    authorName: "Admin Usuario",
-    done: false,
-    category: "pollution",
-  },
-  {
-    id: "2",
-    title: "Deforestación Ilegal",
-    description: "Tala ilegal detectada en zona protegida",
-    date: "2024-01-25",
-    location: {
-      lat: -12.2,
-      lng: -77.1,
-      address: "Zona Protegida Norte",
-    },
-    authorId: "1",
-    authorName: "Admin Usuario",
-    done: false,
-    category: "deforestation",
-  },
-]
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const API_BASE_URL = "http://localhost:8080";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [reports, setReports] = useState<Report[]>(mockReports)
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Check for stored user session
-    const storedUser = localStorage.getItem("earthway_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    try {
+      const storedUser = localStorage.getItem("earthway_user");
+      if (storedUser) {
+        const parsedUser: User = JSON.parse(storedUser);
+        setUser(parsedUser);
+        setAuthToken(parsedUser.token); // restaurar token en axios
+      }
+    } catch (error) {
+      console.error("Error al cargar el usuario desde localStorage:", error);
     }
-  }, [])
+  }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const foundUser = mockUsers.find((u) => u.email === email && u.password === password)
+  const loginMutation = useMutation<LoginResponse, AxiosError, { email: string; password: string }>({
+    mutationFn: async ({ email, password }) => {
+      const response = await axios.post<LoginResponse>(`${API_BASE_URL}/auth/login`, { email, password });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      const token = data.payload.token;
+      const decoded: JwtPayload = jwtDecode(token);
 
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser
-      setUser(userWithoutPassword)
-      localStorage.setItem("earthway_user", JSON.stringify(userWithoutPassword))
-      return true
+      const user: User = {
+        id: decoded.sub,
+        name: decoded.sub.split("@")[0],
+        email: decoded.sub,
+        roles: decoded.roles.map((r) => r.authority as UserRole),
+        token,
+      };
+
+      setUser(user);
+      localStorage.setItem("earthway_user", JSON.stringify(user));
+      setAuthToken(token);
+    },
+    onError: (error) => {
+      console.error("Error en login:", error.response?.data || error.message);
+    },
+  });
+
+  const registerMutation = useMutation<LoginResponse, AxiosError, RegisterData>({
+    mutationFn: async (userData) => {
+      const response = await axios.post<LoginResponse>(`${API_BASE_URL}/auth/register`, userData);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      const token = data.payload.token;
+      const decoded: JwtPayload = jwtDecode(token);
+
+      const user: User = {
+        id: decoded.sub,
+        name: decoded.sub.split("@")[0],
+        email: decoded.sub,
+        roles: decoded.roles.map((r) => r.authority as UserRole),
+        token,
+      };
+
+      setUser(user);
+      localStorage.setItem("earthway_user", JSON.stringify(user));
+      setAuthToken(token);
+    },
+    onError: (error) => {
+      console.error("Error en registro:", error.response?.data || error.message);
+    },
+  });
+
+  const login = async (email: string, password: string) => {
+    if (!email || !password) return false;
+    try {
+      await loginMutation.mutateAsync({ email, password });
+      return true;
+    } catch {
+      return false;
     }
+  };
 
-    return false
-  }
-
-  const register = async (userData: RegisterData): Promise<boolean> => {
-    // Check if user already exists
-    const existingUser = mockUsers.find((u) => u.email === userData.email)
-    if (existingUser) {
-      return false
+  const register = async (userData: RegisterData) => {
+    try {
+      await registerMutation.mutateAsync(userData);
+      return true;
+    } catch {
+      return false;
     }
-
-    const newUser: User & { password: string } = {
-      id: Date.now().toString(),
-      name: userData.name,
-      email: userData.email,
-      password: userData.password,
-      phone: userData.phone,
-      roles: [userData.role],
-    }
-
-    mockUsers.push(newUser)
-
-    const { password: _, ...userWithoutPassword } = newUser
-    setUser(userWithoutPassword)
-    localStorage.setItem("earthway_user", JSON.stringify(userWithoutPassword))
-
-    return true
-  }
+  };
 
   const logout = () => {
-    setUser(null)
-    localStorage.removeItem("earthway_user")
-  }
+    setUser(null);
+    localStorage.removeItem("earthway_user");
+    setAuthToken(""); // limpiar token en axios
+  };
 
-  const hasRole = (role: UserRole): boolean => {
-    return user?.roles.includes(role) || false
-  }
-
-  const isAuthenticated = !!user
+  const hasRole = (role: UserRole) => (user?.roles ?? []).includes(role);
+  const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        register,
-        logout,
-        hasRole,
-        isAuthenticated,
-        reports,
-        setReports,
-      }}
-    >
+    <AuthContext.Provider value={{ user, login, register, logout, hasRole, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  return context;
 }

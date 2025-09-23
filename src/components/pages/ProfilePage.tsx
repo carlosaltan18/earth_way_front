@@ -78,12 +78,6 @@ export default function ProfilePage() {
     confirmPassword: "",
   })
 
-  // Account settings state
-  const [accountSettings, setAccountSettings] = useState({
-    emailNotifications: true,
-    eventReminders: true,
-    marketingEmails: false,
-  })
 
   const [userStats] = useState<UserStats>(mockUserStats)
 
@@ -232,15 +226,10 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2 mt-2">
                     {user.roles.map((role) => (
                       <Badge key={role} variant="secondary">
-                        {role === "ADMIN" ? "Administrador" : role === "ORGANIZATION" ? "Organización" : "Usuario"}
+                        {role === "ROLE_ADMIN" ? "Administrador" : role === "ROLE_ORGANIZATION" ? "Organización" : "Usuario"}
                       </Badge>
                     ))}
                   </div>
-                </div>
-
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Miembro desde</p>
-                  <p className="font-medium">{new Date(userStats.joinDate).toLocaleDateString("es-ES")}</p>
                 </div>
               </div>
             </CardContent>
@@ -250,8 +239,7 @@ export default function ProfilePage() {
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="personal">Información Personal</TabsTrigger>
               <TabsTrigger value="password">Contraseña</TabsTrigger>
-              <TabsTrigger value="settings">Configuración</TabsTrigger>
-              <TabsTrigger value="activity">Actividad</TabsTrigger>
+              <TabsTrigger value="settings">Eliminar Cuenta</TabsTrigger>
             </TabsList>
 
             {/* Personal Information Tab */}
@@ -304,9 +292,9 @@ export default function ProfilePage() {
                         <div className="flex gap-2">
                           {user.roles.map((role) => (
                             <Badge key={role} variant="outline">
-                              {role === "ADMIN"
+                              {role === "ROLE_ADMIN"
                                 ? "Administrador"
-                                : role === "ORGANIZATION"
+                                : role === "ROLE_ORGANIZATION"
                                   ? "Organización"
                                   : "Usuario"}
                             </Badge>
@@ -400,75 +388,6 @@ export default function ProfilePage() {
             {/* Settings Tab */}
             <TabsContent value="settings">
               <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Preferencias de Notificaciones</CardTitle>
-                    <CardDescription>Configura cómo y cuándo quieres recibir notificaciones</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleSettingsSubmit} className="space-y-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Notificaciones por email</Label>
-                            <p className="text-sm text-gray-500">Recibe actualizaciones importantes por correo</p>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={accountSettings.emailNotifications}
-                            onChange={(e) =>
-                              setAccountSettings((prev) => ({ ...prev, emailNotifications: e.target.checked }))
-                            }
-                            className="h-4 w-4"
-                          />
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Recordatorios de eventos</Label>
-                            <p className="text-sm text-gray-500">
-                              Recibe recordatorios de eventos a los que te has unido
-                            </p>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={accountSettings.eventReminders}
-                            onChange={(e) =>
-                              setAccountSettings((prev) => ({ ...prev, eventReminders: e.target.checked }))
-                            }
-                            className="h-4 w-4"
-                          />
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label>Emails promocionales</Label>
-                            <p className="text-sm text-gray-500">Recibe noticias y promociones de EarthWay</p>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={accountSettings.marketingEmails}
-                            onChange={(e) =>
-                              setAccountSettings((prev) => ({ ...prev, marketingEmails: e.target.checked }))
-                            }
-                            className="h-4 w-4"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button type="submit" disabled={isLoading}>
-                          {isLoading ? "Guardando..." : "Guardar Preferencias"}
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-
                 {/* Danger Zone */}
                 <Card className="border-red-200">
                   <CardHeader>
@@ -587,47 +506,6 @@ export default function ProfilePage() {
                     </CardContent>
                   </Card>
                 </div>
-
-                {/* Recent Activity */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Actividad Reciente</CardTitle>
-                    <CardDescription>Tus últimas acciones en la plataforma</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 p-3 border rounded-lg">
-                        <div className="p-2 bg-green-100 rounded-lg">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium">Te uniste al evento "Reforestación Cerro Verde"</p>
-                          <p className="text-sm text-gray-500">Hace 2 días</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 p-3 border rounded-lg">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                          <FileText className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium">Publicaste "Mi experiencia en limpieza de playa"</p>
-                          <p className="text-sm text-gray-500">Hace 5 días</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 p-3 border rounded-lg">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                          <Users className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium">Comenzaste a seguir a "EcoLima"</p>
-                          <p className="text-sm text-gray-500">Hace 1 semana</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
           </Tabs>

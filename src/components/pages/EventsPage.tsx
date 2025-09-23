@@ -190,15 +190,15 @@ export default function EventsPage() {
   }
 
   const canCreateEvent = () => {
-    return hasRole("ORGANIZATION")
+    return hasRole("ROLE_ORGANIZATION")
   }
 
   const canEditEvent = (event: Event) => {
-    return hasRole("ORGANIZATION") && user?.organizationId === event.organizationId
+    return hasRole("ROLE_ORGANIZATION") && user?.organizationId === event.organizationId
   }
 
   const canJoinEvent = () => {
-    return hasRole("USER") || hasRole("ORGANIZATION")
+    return hasRole("ROLE_USER") || hasRole("ROLE_ORGANIZATION")
   }
 
   return (

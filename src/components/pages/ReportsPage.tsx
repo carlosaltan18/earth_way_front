@@ -237,11 +237,11 @@ export default function ReportsPage() {
   }
 
   const canEditReport = (report: Report) => {
-    return hasRole("ADMIN") || (isAuthenticated && user?.id === report.authorId)
+    return hasRole("ROLE_ADMIN") || (isAuthenticated && user?.id === report.authorId)
   }
 
   const canCreateReport = () => {
-    return hasRole("ADMIN")
+    return hasRole("ROLE_ADMIN")
   }
 
   return (
@@ -442,7 +442,7 @@ export default function ReportsPage() {
 
                     {canEditReport(report) && (
                       <div className="flex gap-2">
-                        {hasRole("ADMIN") && (
+                        {hasRole("ROLE_ADMIN") && (
                           <Button
                             variant="ghost"
                             size="sm"

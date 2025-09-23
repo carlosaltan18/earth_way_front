@@ -1,52 +1,42 @@
-"use client"
+"use client";
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/AuthContext"
-import Layout from "@/components/layout/Layout"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useToast } from "@/hooks/use-toast"
-import Link from "next/link"
-import { Leaf } from "lucide-react"
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import Layout from "@/components/layout/Layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
+import { Leaf } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-
-  const { login } = useAuth()
-  const router = useRouter()
-  const { toast } = useToast()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  const { login } = useAuth(); // Usar el método login del AuthContext
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError("")
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
-    try {
-      const success = await login(email, password)
-      if (success) {
-        toast({
-          title: "¡Bienvenido!",
-          description: "Has iniciado sesión correctamente.",
-        })
-        router.push("/")
-      } else {
-        setError("Credenciales incorrectas. Por favor, verifica tu email y contraseña.")
-      }
-    } catch (err) {
-      setError("Error al iniciar sesión. Por favor, intenta de nuevo.")
-    } finally {
-      setIsLoading(false)
+    const success = await login(email, password);
+    setIsLoading(false);
+
+    if (success) {
+      toast({ title: "¡Bienvenido!", description: "Has iniciado sesión correctamente." });
+      router.push("/"); // Redirigir al dashboard o página principal
+    } else {
+      setError("Credenciales incorrectas. Por favor, verifica tu email y contraseña.");
     }
-  }
+  };
 
   return (
     <Layout>
@@ -126,5 +116,5 @@ export default function LoginPage() {
         </div>
       </div>
     </Layout>
-  )
+  );
 }

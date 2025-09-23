@@ -45,7 +45,7 @@ export default function DashboardPage() {
   const { user, hasRole } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
 
-  if (!hasRole("ADMIN") && !hasRole("ORGANIZATION")) {
+  if (!hasRole("ROLE_ADMIN") && !hasRole("ROLE_ORGANIZATION")) {
     return (
       <Layout>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -62,7 +62,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <ProtectedRoute requiredRoles={["ADMIN", "ORGANIZATION"]}>
+    <ProtectedRoute requiredRoles={["ROLE_ADMIN", "ROLE_ORGANIZATION"]}>
       <Layout>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
@@ -188,7 +188,7 @@ export default function DashboardPage() {
                   <CardDescription>Administra usuarios registrados en la plataforma</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {hasRole("ADMIN") ? (
+                  {hasRole("ROLE_ADMIN") ? (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h3 className="text-lg font-medium">Lista de Usuarios</h3>
@@ -267,7 +267,7 @@ export default function DashboardPage() {
                   <CardDescription>Revisa y gestiona reportes ambientales</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {hasRole("ADMIN") ? (
+                  {hasRole("ROLE_ADMIN") ? (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h3 className="text-lg font-medium">Reportes Ambientales</h3>
