@@ -19,11 +19,11 @@ import { Leaf } from "lucide-react"
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: "",
+    surname: "",
     email: "",
     password: "",
     confirmPassword: "",
-    phone: "",
-    role: "" as UserRole | "",
+    phone: ""
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -43,35 +43,28 @@ export default function RegisterPage() {
       return
     }
 
-    if (!formData.role) {
-      setError("Por favor selecciona un tipo de cuenta")
-      setIsLoading(false)
-      return
-    }
-
     try {
-      const success = await register({
+      const data = await register({
         name: formData.name,
+        surname: formData.surname,
         email: formData.email,
         password: formData.password,
         phone: formData.phone,
-        role: formData.role as UserRole,
       })
 
-      if (success) {
-        toast({
-          title: "¡Cuenta creada!",
-          description: "Tu cuenta ha sido creada exitosamente.",
-        })
-        router.push("/")
-      } else {
+      toast({
+        title: "¡Cuenta creada!",
+        description: "Tu cuenta ha sido creada exitosamente.",
+      })
+      router.push("/auth/login")
+    } catch (err: any) {
+      if (err.response?.status === 409) {
         setError("El email ya está registrado. Por favor usa otro email.")
+      } else {
+        setError("Error al crear la cuenta. Por favor, intenta de nuevo.")
       }
-    } catch (err) {
-      setError("Error al crear la cuenta. Por favor, intenta de nuevo.")
-    } finally {
-      setIsLoading(false)
     }
+
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -109,16 +102,29 @@ export default function RegisterPage() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nombre completo</Label>
+                  <Label htmlFor="name">Nombre</Label>
                   <Input
                     id="name"
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleInputChange("name", e.target.value)}
                     required
-                    placeholder="Tu nombre completo"
+                    placeholder="Tu nombre"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="name">surname</Label>
+                  <Input
+                    id="surname"
+                    type="text"
+                    value={formData.surname}
+                    onChange={(e) => handleInputChange("surname", e.target.value)}
+                    required
+                    placeholder="Tu apellido"
+                  />
+                </div>
+
 
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -139,22 +145,27 @@ export default function RegisterPage() {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => handleInputChange("phone", e.target.value)}
-                    placeholder="+1234567890"
+                    placeholder="44225566"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="role">Tipo de cuenta</Label>
-                  <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona el tipo de cuenta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USER">Usuario Individual</SelectItem>
-                      <SelectItem value="ORGANIZATION">Organización</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {
+                  /**
+                   * <div className="space-y-2">
+                    <Label htmlFor="role">Tipo de cuenta</Label>
+                    <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona el tipo de cuenta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USER">Usuario Individual</SelectItem>
+                        <SelectItem value="ORGANIZATION">Organización</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                   * 
+                   */
+                }
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Contraseña</Label>

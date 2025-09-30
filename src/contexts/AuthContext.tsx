@@ -28,10 +28,10 @@ export interface User {
 
 interface RegisterData {
   name: string;
+  surname: string;
   email: string;
   password: string;
   phone?: string;
-  role: UserRole;
 }
 
 interface JwtPayload {
@@ -96,12 +96,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const registerMutation = useMutation<LoginResponse, AxiosError, RegisterData>({
-    mutationFn: async (userData) => {
-      const response = await axios.post<LoginResponse>(`${API_BASE_URL}/auth/register`, userData);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      const token = data.payload.token;
+  mutationFn: async (userData) => {
+    const response = await axios.post<LoginResponse>(`${API_BASE_URL}/auth/register`, userData);
+    return response.data;
+  },
+  onSuccess: (data) => {
+    console.log("Respuesta registro:", data);
+
+    const token = data?.payload?.token || (data as any)?.token;
+
+    if (token) {
+      // Si viene token, logueamos automáticamente
       const decoded: JwtPayload = jwtDecode(token);
 
       const user: User = {
@@ -115,11 +120,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user);
       localStorage.setItem("earthway_user", JSON.stringify(user));
       setAuthToken(token);
-    },
-    onError: (error) => {
-      console.error("Error en registro:", error.response?.data || error.message);
-    },
-  });
+    } else {
+      // Si no hay token, solo avisamos y dejamos que el usuario haga login
+      console.warn("Registro exitoso, pero no se recibió token. El usuario debe iniciar sesión manualmente.");
+    }
+  },
+  onError: (error) => {
+    console.error("Error en registro:", error.response?.data || error.message);
+  },
+});
+
 
   const login = async (email: string, password: string) => {
     if (!email || !password) return false;
