@@ -2,6 +2,9 @@
 
 import type React from "react"
 
+import { useRouter } from "next/navigation";
+import type { UserType } from "@/features/user/types"
+import {useDeleteCurrentUser, useUpdateCurrentUser, useChangePassword} from "@/features/user/queries"
 import { useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/layout/Layout"
@@ -63,6 +66,14 @@ export default function ProfilePage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState("personal")
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+
+
+    // Mutation para actualizar usuario
+const { mutateAsync: updatePassword } = useChangePassword();
+
+  // Mutation para eliminar usuario actual
+  const { mutate: deleteUser, isPending: isDeleting } = useDeleteCurrentUser();
 
   // Personal info form state
   const [personalInfo, setPersonalInfo] = useState({
@@ -73,7 +84,6 @@ export default function ProfilePage() {
 
   // Password form state
   const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   })
@@ -129,10 +139,11 @@ export default function ProfilePage() {
 
     try {
       // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
+     await updatePassword({
+      newPassword: passwordForm.newPassword, // si tu payload lo requiere
+      confirmPassword: passwordForm.confirmPassword,
+    });
       setPasswordForm({
-        currentPassword: "",
         newPassword: "",
         confirmPassword: "",
       })
@@ -152,30 +163,34 @@ export default function ProfilePage() {
     }
   }
 
-  const handleDeleteAccount = async () => {
-    setIsLoading(true)
+ const handleDeleteAccount = () => {
+  setIsLoading(true)
 
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
+  deleteUser(undefined, {
+    onSuccess: () => {
       toast({
         title: "Cuenta eliminada",
         description: "Tu cuenta ha sido eliminada exitosamente.",
       })
 
-      // Logout and redirect
+      // Logout y redirección
       logout()
-    } catch (error) {
+      router.push("/auth/register");
+
+    },
+    onError: () => {
       toast({
         title: "Error",
         description: "No se pudo eliminar tu cuenta. Intenta de nuevo.",
         variant: "destructive",
       })
-    } finally {
+    },
+    onSettled: () => {
       setIsLoading(false)
-    }
-  }
+    },
+  })
+}
+
 
   const handleSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -333,16 +348,6 @@ export default function ProfilePage() {
                 <CardContent>
                   <form onSubmit={handlePasswordSubmit} className="space-y-6">
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="currentPassword">Contraseña actual</Label>
-                        <Input
-                          id="currentPassword"
-                          type="password"
-                          value={passwordForm.currentPassword}
-                          onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-                          placeholder="Tu contraseña actual"
-                        />
-                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="newPassword">Nueva contraseña</Label>
@@ -421,9 +426,9 @@ export default function ProfilePage() {
                               Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y removerá
                               todos tus datos de nuestros servidores, incluyendo:
                               <br />
-                              <br />• Todas tus publicaciones ({userStats.postsCount})
-                              <br />• Tu participación en eventos ({userStats.eventsJoined})
-                              <br />• Tus reportes ambientales ({userStats.reportsSubmitted})
+                              <br />• Todas tus publicaciones 
+                              <br />• Tu participación en eventos 
+                              <br />• Tus reportes ambientales 
                               <br />• Tu información de perfil y configuraciones
                             </AlertDialogDescription>
                           </AlertDialogHeader>

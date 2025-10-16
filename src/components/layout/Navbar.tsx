@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
@@ -18,11 +19,13 @@ export default function Navbar() {
   const { user, logout, hasRole, isAuthenticated } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
       await logout()
       setIsMenuOpen(false)
+      router.push("/auth/login");
     } catch (error) {
       console.error("Error al cerrar sesión:", error)
     }
