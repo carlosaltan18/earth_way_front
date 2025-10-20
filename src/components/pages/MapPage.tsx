@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MapPin, Calendar, Users, TreePine, Trash2, GraduationCap, Shield } from "lucide-react"
+import dynamic from "next/dynamic"
 
 interface MapLocation {
   id: string
@@ -104,6 +105,26 @@ const statusLabels = {
   pending: "Pendiente",
 }
 
+const categoryMarkerColors = {
+  reforestation: "green",
+  cleanup: "blue",
+  education: "purple",
+  conservation: "orange",
+}
+
+// Componente del mapa dinámico (solo se carga en cliente)
+const MapComponentDynamic = dynamic(
+  () => import("@/components/map/MapWithMarkers").then((mod) => mod.default),
+  { 
+    ssr: false, 
+    loading: () => (
+      <div className="w-full h-[500px] bg-gray-100 rounded-lg flex items-center justify-center">
+        <p className="text-gray-500">Cargando mapa...</p>
+      </div>
+    ),
+  }
+)
+
 export default function MapPage() {
   const { user, isAuthenticated } = useAuth()
   const [locations, setLocations] = useState<MapLocation[]>(mockLocations)
@@ -151,22 +172,19 @@ export default function MapPage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Map Placeholder */}
+          {/* Map */}
           <div className="lg:col-span-2">
             <Card className="h-[600px]">
               <CardHeader>
                 <CardTitle>Mapa de Eventos y Reportes</CardTitle>
                 <CardDescription>Mapa interactivo con ubicaciones de eventos y reportes ambientales</CardDescription>
               </CardHeader>
-              <CardContent className="h-full">
-                <div className="w-full h-[500px] bg-gray-100 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg font-medium">Mapa Interactivo</p>
-                    <p className="text-gray-400 text-sm mt-2">Aquí se integraría Leaflet o Google Maps</p>
-                    <p className="text-gray-400 text-sm">Mostrando {filteredLocations.length} ubicaciones</p>
-                  </div>
-                </div>
+              <CardContent className="h-full p-0 border-t">
+                <MapComponentDynamic
+                  locations={filteredLocations}
+                  selectedLocation={selectedLocation}
+                  onLocationSelect={setSelectedLocation}
+                />
               </CardContent>
             </Card>
           </div>
