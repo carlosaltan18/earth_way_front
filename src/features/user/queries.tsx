@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "./api";
-import type { UserType, GetUsersParams, ChangePasswordPayload } from "./types";
+import type { UserType as User, GetUsersParams, ChangePasswordPayload, PaginatedUsersResponse } from "./types";
 
 export const userKeys = {
   all: ["users"] as const,
@@ -10,6 +10,7 @@ export const userKeys = {
   detail: (id: number) => [...userKeys.details(), id] as const,
 };
 
+// Queries
 export const useGetUsers = (params?: GetUsersParams) => {
   return useQuery({
     queryKey: userKeys.list(params),
@@ -25,11 +26,12 @@ export const useGetUser = (idUser: number) => {
   });
 };
 
+// Mutations
 export const useUpdateCurrentUser = () => {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (user: Partial<UserType>) => userApi.updateCurrentUser(user),
+    mutationFn: (user: Partial<User>) => userApi.updateCurrentUser(user),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: userKeys.all });
     },
@@ -40,7 +42,7 @@ export const useUpdateUserById = () => {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ idUser, user }: { idUser: number; user: Partial<UserType> }) =>
+    mutationFn: ({ idUser, user }: { idUser: number; user: Partial<User> }) =>
       userApi.updateUserById(idUser, user),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: userKeys.detail(variables.idUser) });

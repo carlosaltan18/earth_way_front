@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import type { UserType, PaginatedUsersResponse } from "@/features/user/types"
+import { useAddRoleToUser, useRemoveRoleFromUser, useGetRoles } from "@/features/role/queries"
+import { useGetUsers } from "@/features/user/queries"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/layout/Layout"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
@@ -52,6 +55,16 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import type { UserRole } from "@/contexts/AuthContext"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { MoreVertical, UserCog, Shield as ShieldIcon } from "lucide-react"
+
 
 // Interfaces
 interface DashboardUser {
@@ -61,7 +74,6 @@ interface DashboardUser {
   phone?: string
   roles: UserRole[]
   organizationId?: string
-  createdAt: string
 }
 
 interface DashboardEvent {
@@ -113,34 +125,7 @@ interface DashboardReport {
   severity: "low" | "medium" | "high"
 }
 
-// Mock data
-const mockUsers: DashboardUser[] = [
-  {
-    id: "1",
-    name: "Admin Usuario",
-    email: "admin@earthway.com",
-    phone: "+1234567890",
-    roles: ["ROLE_ADMIN"],
-    createdAt: "2023-01-15",
-  },
-  {
-    id: "2",
-    name: "Usuario Regular",
-    email: "user@earthway.com",
-    phone: "+1234567891",
-    roles: ["ROLE_USER"],
-    createdAt: "2023-06-20",
-  },
-  {
-    id: "3",
-    name: "EcoOrg",
-    email: "org@earthway.com",
-    phone: "+1234567892",
-    roles: ["ROLE_ORGANIZATION"],
-    organizationId: "1",
-    createdAt: "2023-03-10",
-  },
-]
+
 
 const mockEvents: DashboardEvent[] = [
   {
@@ -244,14 +229,6 @@ const mockReports: DashboardReport[] = [
   },
 ]
 
-const dashboardStats = {
-  totalUsers: 2847,
-  totalEvents: 156,
-  totalPosts: 423,
-  totalOrganizations: 89,
-  pendingReports: 12,
-  activeEvents: 23,
-}
 
 const categoryLabels = {
   reforestation: "Reforestación",
@@ -271,14 +248,151 @@ const categoryLabels = {
 export default function DashboardPage() {
   const { user, hasRole } = useAuth()
   const { toast } = useToast()
-  const [activeTab, setActiveTab] = useState("overview")
+  const [activeTab, setActiveTab] = useState("users")
 
+  const [users, setUsers] = useState<DashboardUser[]>([])
+  const [page, setPage] = useState(0)
+  const [size] = useState(10)
+
+  // Dialog states
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<DashboardUser | null>(null)
   // State for each section
-  const [users, setUsers] = useState<DashboardUser[]>(mockUsers)
   const [events, setEvents] = useState<DashboardEvent[]>(mockEvents)
   const [posts, setPosts] = useState<DashboardPost[]>(mockPosts)
   const [organizations, setOrganizations] = useState<DashboardOrganization[]>(mockOrganizations)
   const [reports, setReports] = useState<DashboardReport[]>(mockReports)
+
+
+  const {
+    data: usersData,
+    isLoading: isLoadingUsers,
+    error: usersError,
+    isError,
+    isSuccess
+  } = useGetUsers({ page, size })
+
+  // Get available roles
+const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
+  const { mutate: addRole, isPending: isAddingRole } = useAddRoleToUser()
+  const { mutate: removeRole, isPending: isRemovingRole } = useRemoveRoleFromUser()
+
+
+
+  // Listar Usuarios desde la API
+  useEffect(() => {
+    if (usersData?.payload && Array.isArray(usersData.payload)) {
+      const mappedUsers: DashboardUser[] = usersData.payload.map((user: UserType) => {
+        const roleNames = user.roles.map(role => role.name);
+
+        const validRoles = roleNames.filter((role): role is UserRole =>
+          role === "ROLE_ADMIN" || role === "ROLE_USER" || role === "ROLE_ORGANIZATION"
+        );
+
+        return {
+          id: user.id.toString(),
+          name: `${user.name} ${user.surname}`.trim(),
+          email: user.email || '',
+          phone: user.phone || '',
+          roles: validRoles.length > 0 ? validRoles : ["ROLE_USER"],
+          createdAt: new Date().toISOString()
+        };
+      });
+
+      setUsers(mappedUsers)
+    }
+  }, [usersData])
+
+
+  // Manejo de errores
+  useEffect(() => {
+    if (usersError) {
+      console.error('Error loading users:', usersError)
+      toast({
+        title: "Error",
+        description: `No se pudieron cargar los usuarios: ${usersError.message}`,
+        variant: "destructive",
+      })
+    }
+  }, [usersError, toast])
+
+  // Handle role change
+  const handleAddRole = (roleName: string) => {
+    if (!selectedUser) return;
+
+    // Check if user already has this role
+    if (selectedUser.roles.includes(roleName as UserRole)) {
+      toast({
+        title: "Información",
+        description: "El usuario ya tiene este rol.",
+        variant: "default",
+      })
+      return;
+    }
+
+    addRole(
+      { userId: Number(selectedUser.id), roleName },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Rol agregado",
+            description: `El rol ${roleName} ha sido agregado al usuario.`,
+          })
+          setRoleDialogOpen(false)
+          setSelectedUser(null)
+        },
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: "No se pudo agregar el rol",
+            variant: "destructive",
+          })
+          console.error('Error adding role:', error)
+        },
+      }
+    )
+  }
+
+  const handleRemoveRole = (roleName: string) => {
+    if (!selectedUser) return;
+
+    // Prevent removing last role
+    if (selectedUser.roles.length === 1) {
+      toast({
+        title: "Error",
+        description: "Un usuario debe tener al menos un rol.",
+        variant: "destructive",
+      })
+      return;
+    }
+
+    removeRole(
+      { userId: Number(selectedUser.id), roleName },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Rol removido",
+            description: `El rol ${roleName} ha sido removido del usuario.`,
+          })
+          setRoleDialogOpen(false)
+          setSelectedUser(null)
+        },
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: "No se pudo remover el rol",
+            variant: "destructive",
+          })
+          console.error('Error removing role:', error)
+        },
+      }
+    )
+  }
+  const openRoleDialog = (user: DashboardUser) => {
+    setSelectedUser(user)
+    setRoleDialogOpen(true)
+  }
+
 
   // Search states
   const [userSearch, setUserSearch] = useState("")
@@ -369,7 +483,6 @@ export default function DashboardPage() {
       email: userForm.email,
       phone: userForm.phone,
       roles: ["ROLE_ORGANIZATION"],
-      createdAt: new Date().toISOString().split("T")[0],
     }
 
     setUsers((prev) => [...prev, newUser])
@@ -439,14 +552,14 @@ export default function DashboardPage() {
       prev.map((event) =>
         event.id === editingEvent!.id
           ? {
-              ...event,
-              name: eventForm.name,
-              description: eventForm.description,
-              date: eventForm.date,
-              location: eventForm.location,
-              maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined,
-              category: eventForm.category as DashboardEvent["category"],
-            }
+            ...event,
+            name: eventForm.name,
+            description: eventForm.description,
+            date: eventForm.date,
+            location: eventForm.location,
+            maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined,
+            category: eventForm.category as DashboardEvent["category"],
+          }
           : event,
       ),
     )
@@ -549,15 +662,15 @@ export default function DashboardPage() {
       prev.map((org) =>
         org.id === editingOrg!.id
           ? {
-              ...org,
-              name: orgForm.name,
-              description: orgForm.description,
-              email: orgForm.email,
-              phone: orgForm.phone,
-              address: orgForm.address,
-              category: orgForm.category as DashboardOrganization["category"],
-              founded: orgForm.founded,
-            }
+            ...org,
+            name: orgForm.name,
+            description: orgForm.description,
+            email: orgForm.email,
+            phone: orgForm.phone,
+            address: orgForm.address,
+            category: orgForm.category as DashboardOrganization["category"],
+            founded: orgForm.founded,
+          }
           : org,
       ),
     )
@@ -632,160 +745,53 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute requiredRoles={["ROLE_ADMIN", "ROLE_ORGANIZATION"]}>
       <Layout>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard Administrativo</h1>
-            <p className="text-gray-600 mt-2">Panel de control para gestión de la plataforma</p>
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+          <div className="mb-4 sm:mb-6 lg:mb-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">Dashboard Administrativo</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">Panel de control para gestión de la plataforma</p>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
-              <TabsTrigger value="overview">Resumen</TabsTrigger>
-              {hasRole("ROLE_ADMIN") && <TabsTrigger value="users">Usuarios</TabsTrigger>}
-              <TabsTrigger value="events">Eventos</TabsTrigger>
-              <TabsTrigger value="posts">Publicaciones</TabsTrigger>
-              {hasRole("ROLE_ADMIN") && <TabsTrigger value="organizations">Organizaciones</TabsTrigger>}
-              <TabsTrigger value="reports">Reportes</TabsTrigger>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {hasRole("ROLE_ADMIN") && (
+                <TabsTrigger value="users" className="text-sm sm:text-base">
+                  Usuarios
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="events" className="text-sm sm:text-base">
+                Eventos
+              </TabsTrigger>
+              <TabsTrigger value="posts" className="text-sm sm:text-base">
+                Publicaciones
+              </TabsTrigger>
+              {hasRole("ROLE_ADMIN") && (
+                <TabsTrigger value="organizations" className="text-sm sm:text-base">
+                  Organizaciones
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="reports" className="text-sm sm:text-base">
+                Reportes
+              </TabsTrigger>
             </TabsList>
 
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{users.length}</div>
-                    <p className="text-xs text-muted-foreground">Usuarios registrados</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Eventos Activos</CardTitle>
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{events.filter((e) => !e.finished).length}</div>
-                    <p className="text-xs text-muted-foreground">{events.length} eventos totales</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Publicaciones</CardTitle>
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{posts.length}</div>
-                    <p className="text-xs text-muted-foreground">Publicaciones totales</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Organizaciones</CardTitle>
-                    <Building className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{organizations.length}</div>
-                    <p className="text-xs text-muted-foreground">Organizaciones activas</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Reportes Pendientes</CardTitle>
-                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-orange-600">{reports.filter((r) => !r.done).length}</div>
-                    <p className="text-xs text-muted-foreground">{reports.length} reportes totales</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Crecimiento</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">+15%</div>
-                    <p className="text-xs text-muted-foreground">Participación mensual</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
 
             {/* Users Tab */}
             {hasRole("ROLE_ADMIN") && (
               <TabsContent value="users" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
                       <div>
-                        <CardTitle>Gestión de Usuarios</CardTitle>
-                        <CardDescription>Administra usuarios de la plataforma</CardDescription>
+                        <CardTitle className="text-xl sm:text-2xl">Gestión de Usuarios</CardTitle>
+                        <CardDescription className="text-sm sm:text-base">
+                          Administra usuarios de la plataforma
+                        </CardDescription>
+                        {usersData && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            Total: {usersData.totalElements} usuarios
+                          </p>
+                        )}
                       </div>
-                      <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Crear Usuario Organización
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Crear Usuario de Organización</DialogTitle>
-                            <DialogDescription>Crea una cuenta de usuario con rol de organización</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <Label>Nombre</Label>
-                              <Input
-                                value={userForm.name}
-                                onChange={(e) => setUserForm((prev) => ({ ...prev, name: e.target.value }))}
-                                placeholder="Nombre de la organización"
-                              />
-                            </div>
-                            <div>
-                              <Label>Email</Label>
-                              <Input
-                                type="email"
-                                value={userForm.email}
-                                onChange={(e) => setUserForm((prev) => ({ ...prev, email: e.target.value }))}
-                                placeholder="email@organization.com"
-                              />
-                            </div>
-                            <div>
-                              <Label>Teléfono (opcional)</Label>
-                              <Input
-                                value={userForm.phone}
-                                onChange={(e) => setUserForm((prev) => ({ ...prev, phone: e.target.value }))}
-                                placeholder="+51 123 456 789"
-                              />
-                            </div>
-                            <div>
-                              <Label>Contraseña</Label>
-                              <Input
-                                type="password"
-                                value={userForm.password}
-                                onChange={(e) => setUserForm((prev) => ({ ...prev, password: e.target.value }))}
-                                placeholder="Contraseña inicial"
-                              />
-                            </div>
-                          </div>
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                              Cancelar
-                            </Button>
-                            <Button onClick={handleCreateUser}>Crear Usuario</Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -799,67 +805,104 @@ export default function DashboardPage() {
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      {filteredUsers.map((user) => (
-                        <Card key={user.id}>
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h4 className="font-semibold">{user.name}</h4>
-                                  {user.roles.map((role) => (
-                                    <Badge key={role} variant="secondary">
-                                      {role}
-                                    </Badge>
-                                  ))}
-                                </div>
-                                <div className="space-y-1 text-sm text-gray-600">
-                                  <div className="flex items-center gap-2">
-                                    <Mail className="h-4 w-4" />
-                                    {user.email}
-                                  </div>
-                                  {user.phone && (
-                                    <div className="flex items-center gap-2">
-                                      <Phone className="h-4 w-4" />
-                                      {user.phone}
+                    {/* Loading state */}
+                    {isLoadingUsers && (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Cargando usuarios...</p>
+                      </div>
+                    )}
+
+                    {/* Error state */}
+                    {isError && (
+                      <div className="text-center py-8 bg-red-50 rounded-lg">
+                        <p className="text-red-500">Error al cargar usuarios</p>
+                      </div>
+                    )}
+
+                    {/* Users list */}
+                    {isSuccess && users.length > 0 && (
+                      <>
+                        <div className="space-y-3">
+                          {filteredUsers.map((user) => (
+                            <Card key={user.id}>
+                              <CardContent className="p-3 sm:p-4">
+                                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-2">
+                                  <div className="flex-1 w-full">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                      <h4 className="font-semibold text-sm sm:text-base">{user.name}</h4>
+                                      <div className="flex flex-wrap gap-1">
+                                        {user.roles.map((role) => (
+                                          <Badge key={role} variant="secondary" className="text-xs sm:text-sm">
+                                            {role}
+                                          </Badge>
+                                        ))}
+                                      </div>
                                     </div>
-                                  )}
-                                  <div className="flex items-center gap-2">
-                                    <Calendar className="h-4 w-4" />
-                                    Registrado: {new Date(user.createdAt).toLocaleDateString("es-ES")}
+                                    <div className="space-y-2 text-xs sm:text-sm text-gray-600">
+                                      <div className="flex items-center gap-2 break-all">
+                                        <Mail className="h-4 w-4 flex-shrink-0" />
+                                        {user.email}
+                                      </div>
+                                      {user.phone && (
+                                        <div className="flex items-center gap-2">
+                                          <Phone className="h-4 w-4 flex-shrink-0" />
+                                          {user.phone}
+                                        </div>
+                                      )}
+
+                                    </div>
+                                  </div>
+
+                                  {/* Actions Menu */}
+                                  <div className="flex gap-2">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm">
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => openRoleDialog(user)}>
+                                          <UserCog className="h-4 w-4 mr-2" />
+                                          Gestionar Roles
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   </div>
                                 </div>
-                              </div>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Se eliminarán todos los datos asociados al
-                                      usuario.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteUser(user.id)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                    >
-                                      Eliminar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+
+                        {/* Paginación */}
+                        {usersData && usersData.totalPages > 1 && (
+                          <div className="flex justify-between items-center mt-4">
+                            <Button
+                              variant="outline"
+                              onClick={() => setPage((p) => Math.max(0, p - 1))}
+                              disabled={page === 0}
+                            >
+                              Anterior
+                            </Button>
+                            <span className="text-sm text-gray-600">
+                              Página {page + 1} de {usersData.totalPages}
+                            </span>
+                            <Button
+                              variant="outline"
+                              onClick={() => setPage((p) => p + 1)}
+                              disabled={page >= usersData.totalPages - 1}
+                            >
+                              Siguiente
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -869,15 +912,15 @@ export default function DashboardPage() {
             <TabsContent value="events" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
                     <div>
-                      <CardTitle>Gestión de Eventos</CardTitle>
-                      <CardDescription>Administra eventos ambientales</CardDescription>
+                      <CardTitle className="text-xl sm:text-2xl">Gestión de Eventos</CardTitle>
+                      <CardDescription className="text-sm sm:text-base">Administra eventos ambientales</CardDescription>
                     </div>
                     {hasRole("ROLE_ORGANIZATION") && (
                       <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button>
+                          <Button className="w-full sm:w-auto">
                             <Plus className="h-4 w-4 mr-2" />
                             Crear Evento
                           </Button>
@@ -995,32 +1038,34 @@ export default function DashboardPage() {
                   <div className="space-y-3">
                     {filteredEvents.map((event) => (
                       <Card key={event.id}>
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h4 className="font-semibold">{event.name}</h4>
-                                <Badge>{categoryLabels[event.category]}</Badge>
-                                {event.finished && <Badge variant="secondary">Finalizado</Badge>}
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-2">
+                            <div className="flex-1 w-full">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <h4 className="font-semibold text-sm sm:text-base">{event.name}</h4>
+                                <div className="flex flex-wrap gap-1">
+                                  <Badge className="text-xs sm:text-sm">{categoryLabels[event.category]}</Badge>
+                                  {event.finished && <Badge variant="secondary" className="text-xs sm:text-sm">Finalizado</Badge>}
+                                </div>
                               </div>
-                              <p className="text-sm text-gray-600 mb-2">{event.description}</p>
-                              <div className="space-y-1 text-sm text-gray-600">
+                              <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2 sm:line-clamp-none">{event.description}</p>
+                              <div className="space-y-2 text-xs sm:text-sm text-gray-600">
                                 <div className="flex items-center gap-2">
-                                  <Calendar className="h-4 w-4" />
+                                  <Calendar className="h-4 w-4 flex-shrink-0" />
                                   {new Date(event.date).toLocaleDateString("es-ES")}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4" />
-                                  {event.location}
+                                  <MapPin className="h-4 w-4 flex-shrink-0" />
+                                  <span className="line-clamp-1">{event.location}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Users className="h-4 w-4" />
+                                  <Users className="h-4 w-4 flex-shrink-0" />
                                   {event.participants} participantes
                                   {event.maxParticipants && ` / ${event.maxParticipants}`}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Building className="h-4 w-4" />
-                                  {event.organizationName}
+                                  <Building className="h-4 w-4 flex-shrink-0" />
+                                  <span className="line-clamp-1">{event.organizationName}</span>
                                 </div>
                               </div>
                             </div>
@@ -1483,7 +1528,93 @@ export default function DashboardPage() {
             </TabsContent>
           </Tabs>
         </div>
+        {/* Role Management Dialog */}
+        <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShieldIcon className="h-5 w-5" />
+                Gestionar Roles de Usuario
+              </DialogTitle>
+              <DialogDescription>
+                Usuario: <strong>{selectedUser?.name}</strong>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              {/* Current Roles */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Roles Actuales</Label>
+                <div className="space-y-2">
+                  {selectedUser?.roles.map((role) => (
+                    <div
+                      key={role}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{role}</Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveRole(role)}
+                        disabled={isRemovingRole || selectedUser.roles.length === 1}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Available Roles to Add */}
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Agregar Rol</Label>
+                {isLoadingRoles ? (
+                  <p className="text-sm text-gray-500">Cargando roles disponibles...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {availableRoles
+                      ?.filter((role) => !selectedUser?.roles.includes(role.name as UserRole))
+                      .map((role) => (
+                        <Button
+                          key={role.id}
+                          variant="outline"
+                          className="w-full justify-start"
+                          onClick={() => handleAddRole(role.name)}
+                          disabled={isAddingRole}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          {role.name}
+                        </Button>
+                      ))}
+                    {availableRoles?.every((role) =>
+                      selectedUser?.roles.includes(role.name as UserRole)
+                    ) && (
+                        <p className="text-sm text-gray-500 text-center py-4">
+                          El usuario ya tiene todos los roles disponibles
+                        </p>
+                      )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRoleDialogOpen(false)
+                  setSelectedUser(null)
+                }}
+              >
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Layout>
-    </ProtectedRoute>
+    </ProtectedRoute >
   )
 }
