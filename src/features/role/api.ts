@@ -5,11 +5,12 @@ export const roleApi = {
   list: async (): Promise<Role[]> => {
     try {
       const response = await api.get("/role");
-      return response.data;
+      return response.data.roles; 
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }
   },
+
 
   get: async (id: number): Promise<Role> => {
     try {
