@@ -1,8 +1,8 @@
 import { api, ApiError } from "@/lib/api";
-import type { Post } from "./types";
+import type { Post, PostsApiResponse } from "./types";
 
 export const postApi = {
-  list: async (): Promise<Post[]> => {
+  list: async (): Promise<PostsApiResponse> => {
     try {
       const response = await api.get("/post/listPost");
       return response.data;
