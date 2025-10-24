@@ -1,8 +1,9 @@
 import { api, ApiError } from "@/lib/api";
-import type { Event, GetEventsParams, Participant } from "./types";
+import type { Event, GetEventsParams, PaginatedEventsResponse, Participant } from "./types";
+import { PaginatedUsersResponse } from "../user/types";
 
 export const eventApi = {
-  list: async (params?: GetEventsParams): Promise<Event[]> => {
+  list: async (params?: GetEventsParams): Promise<PaginatedEventsResponse> => {
     try {
       const response = await api.get("/event/", { params });
       return response.data;

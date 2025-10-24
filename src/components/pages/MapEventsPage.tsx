@@ -1,28 +1,66 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useAuth } from "@/contexts/AuthContext"
-import Layout from "@/components/layout/Layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MapPin, Calendar, Users, TreePine, Trash2, GraduationCap, Shield } from "lucide-react"
+import { useMemo, useState } from "react";
+import { useGetEvents } from "@/features/event/queries";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import Layout from "@/components/layout/Layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  MapPin,
+  Calendar,
+  Users,
+  TreePine,
+  Trash2,
+  GraduationCap,
+  Shield,
+} from "lucide-react";
+import dynamic from "next/dynamic";
 
 interface MapEvent {
-  id: string
-  name: string
-  category: "reforestation" | "cleanup" | "education" | "conservation"
-  lat: number
-  lng: number
-  address: string
-  date: string
-  description: string
-  organizationName: string
-  status: "active" | "completed"
-  participants: number
+  id: string;
+  name: string;
+  category: "reforestation" | "cleanup" | "education" | "conservation";
+  lat: number;
+  lng: number;
+  address: string;
+  date: string;
+  description: string;
+  organizationName: string;
+  status: "active" | "completed";
+  participants: number;
 }
+
+// Importación dinámica
+const MapComponentDynamic = dynamic(
+  () => import("@/components/map/MapWithMarkers"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+          <p className="text-gray-600 mt-3">Inicializando mapa...</p>
+        </div>
+      </div>
+    ),
+  }
+);
 
 // Mock events data for map
 const mockMapEvents: MapEvent[] = [
@@ -65,51 +103,92 @@ const mockMapEvents: MapEvent[] = [
     status: "completed",
     participants: 32,
   },
-]
+];
 
 const categoryIcons = {
   reforestation: TreePine,
   cleanup: Trash2,
   education: GraduationCap,
   conservation: Shield,
-}
+};
 
 const categoryColors = {
   reforestation: "bg-green-100 text-green-800",
   cleanup: "bg-blue-100 text-blue-800",
   education: "bg-purple-100 text-purple-800",
   conservation: "bg-orange-100 text-orange-800",
-}
+};
 
 const statusColors = {
   active: "bg-green-100 text-green-800",
   completed: "bg-gray-100 text-gray-800",
-}
+};
 
 const statusLabels = {
   active: "Activo",
   completed: "Completado",
-}
+};
 
 export default function MapEventsPage() {
-  const { isAuthenticated } = useAuth()
-  const [events] = useState<MapEvent[]>(mockMapEvents)
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [selectedStatus, setSelectedStatus] = useState<string>("all")
-  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null)
+  
+  const { isAuthenticated } = useAuth();
+  const [events] = useState<MapEvent[]>(mockMapEvents);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
+
+
+  const queryEvents = useGetEvents();
+  
+
+  
+    // Crear puntos del mapa
+    const points = useMemo(() => {
+      if (!queryEvents.data) return [];
+      console.log("Datos de eventos:", queryEvents.data);
+      const eventPoints = queryEvents.data.payload
+        .filter((e: any) => e?.latitude != null && e?.longitude != null)
+        .map((e: any) => ({
+          id: `event-${e.id}`,
+          type: "event" as const,
+          title: e.name || "Evento sin nombre",
+          subtitle: e.direction || e.description || "",
+          lat: Number(e.latitude),
+          lng: Number(e.longitude),
+          raw: e,
+        }));
+  
+      /* const reportPoints = reports
+        .filter((r: any) => r?.latitude != null && r?.longitude != null)
+        .map((r: any) => ({
+          id: `report-${r.id}`,
+          type: "report" as const,
+          title: r.title || `Reporte ${r.id}`,
+          subtitle: r.description || "",
+          lat: Number(r.latitude),
+          lng: Number(r.longitude),
+          raw: r,
+        })); */
+  
+      return [...eventPoints];
+    }, [queryEvents.data]);
 
   const filteredEvents = events.filter((event) => {
-    const matchesCategory = selectedCategory === "all" || event.category === selectedCategory
-    const matchesStatus = selectedStatus === "all" || event.status === selectedStatus
-    return matchesCategory && matchesStatus
-  })
+    const matchesCategory =
+      selectedCategory === "all" || event.category === selectedCategory;
+    const matchesStatus =
+      selectedStatus === "all" || event.status === selectedStatus;
+    return matchesCategory && matchesStatus;
+  });
 
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Mapa de Eventos</h1>
-          <p className="text-gray-600 mt-2">Visualiza eventos ambientales geolocalizados</p>
+          <p className="text-gray-600 mt-2">
+            Visualiza eventos ambientales geolocalizados
+          </p>
         </div>
 
         {!isAuthenticated && (
@@ -117,7 +196,8 @@ export default function MapEventsPage() {
             <CardContent className="p-4">
               <div className="text-center">
                 <p className="text-green-700 mb-3">
-                  <strong>¿Quieres participar en eventos?</strong> Regístrate para unirte a la comunidad.
+                  <strong>¿Quieres participar en eventos?</strong> Regístrate
+                  para unirte a la comunidad.
                 </p>
                 <div className="flex justify-center gap-3">
                   <Button
@@ -128,7 +208,11 @@ export default function MapEventsPage() {
                   >
                     <Link href="/auth/login">Iniciar Sesión</Link>
                   </Button>
-                  <Button asChild size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button
+                    asChild
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
                     <Link href="/auth/register">Registrarse</Link>
                   </Button>
                 </div>
@@ -143,16 +227,17 @@ export default function MapEventsPage() {
             <Card className="h-[600px]">
               <CardHeader>
                 <CardTitle>Mapa de Eventos Ambientales</CardTitle>
-                <CardDescription>Ubicaciones de eventos de reforestación y conservación</CardDescription>
+                <CardDescription>
+                  Ubicaciones de eventos de reforestación y conservación
+                </CardDescription>
               </CardHeader>
               <CardContent className="h-full">
                 <div className="w-full h-[500px] bg-green-50 rounded-lg flex items-center justify-center border-2 border-dashed border-green-200">
-                  <div className="text-center">
-                    <TreePine className="h-16 w-16 text-green-400 mx-auto mb-4" />
-                    <p className="text-green-600 text-lg font-medium">Mapa de Eventos</p>
-                    <p className="text-green-500 text-sm mt-2">Integración con Leaflet/Google Maps</p>
-                    <p className="text-green-500 text-sm">Mostrando {filteredEvents.length} eventos</p>
-                  </div>
+                  <MapComponentDynamic
+                    points={points}
+                    initialCenter={ [ -12.0464, -77.0428 ] }
+                    onMapReady={() => {}}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -167,14 +252,21 @@ export default function MapEventsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Categoría</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <label className="text-sm font-medium mb-2 block">
+                    Categoría
+                  </label>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="reforestation">Reforestación</SelectItem>
+                      <SelectItem value="reforestation">
+                        Reforestación
+                      </SelectItem>
                       <SelectItem value="cleanup">Limpieza</SelectItem>
                       <SelectItem value="education">Educación</SelectItem>
                       <SelectItem value="conservation">Conservación</SelectItem>
@@ -183,8 +275,13 @@ export default function MapEventsPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Estado</label>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <label className="text-sm font-medium mb-2 block">
+                    Estado
+                  </label>
+                  <Select
+                    value={selectedStatus}
+                    onValueChange={setSelectedStatus}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -205,12 +302,14 @@ export default function MapEventsPage() {
               </CardHeader>
               <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
                 {filteredEvents.map((event) => {
-                  const IconComponent = categoryIcons[event.category]
+                  const IconComponent = categoryIcons[event.category];
                   return (
                     <div
                       key={event.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 ${
-                        selectedEvent?.id === event.id ? "border-green-500 bg-green-50" : "border-gray-200"
+                        selectedEvent?.id === event.id
+                          ? "border-green-500 bg-green-50"
+                          : "border-gray-200"
                       }`}
                       onClick={() => setSelectedEvent(event)}
                     >
@@ -219,18 +318,32 @@ export default function MapEventsPage() {
                           <IconComponent className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{event.name}</h4>
-                          <p className="text-xs text-gray-500 mt-1">{event.address}</p>
+                          <h4 className="font-medium text-sm truncate">
+                            {event.name}
+                          </h4>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {event.address}
+                          </p>
                           <div className="flex items-center gap-2 mt-2">
-                            <Badge className={`text-xs ${categoryColors[event.category]}`}>{event.category}</Badge>
-                            <Badge className={`text-xs ${statusColors[event.status]}`}>
+                            <Badge
+                              className={`text-xs ${
+                                categoryColors[event.category]
+                              }`}
+                            >
+                              {event.category}
+                            </Badge>
+                            <Badge
+                              className={`text-xs ${
+                                statusColors[event.status]
+                              }`}
+                            >
                               {statusLabels[event.status]}
                             </Badge>
                           </div>
                         </div>
                       </div>
                     </div>
-                  )
+                  );
                 })}
 
                 {filteredEvents.length === 0 && (
@@ -246,14 +359,22 @@ export default function MapEventsPage() {
             {selectedEvent && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">{selectedEvent.name}</CardTitle>
+                  <CardTitle className="text-lg">
+                    {selectedEvent.name}
+                  </CardTitle>
                   <div className="flex gap-2">
-                    <Badge className={categoryColors[selectedEvent.category]}>{selectedEvent.category}</Badge>
-                    <Badge className={statusColors[selectedEvent.status]}>{statusLabels[selectedEvent.status]}</Badge>
+                    <Badge className={categoryColors[selectedEvent.category]}>
+                      {selectedEvent.category}
+                    </Badge>
+                    <Badge className={statusColors[selectedEvent.status]}>
+                      {statusLabels[selectedEvent.status]}
+                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-sm text-gray-600">{selectedEvent.description}</p>
+                  <p className="text-sm text-gray-600">
+                    {selectedEvent.description}
+                  </p>
 
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
@@ -262,7 +383,11 @@ export default function MapEventsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-gray-400" />
-                      <span>{new Date(selectedEvent.date).toLocaleDateString("es-ES")}</span>
+                      <span>
+                        {new Date(selectedEvent.date).toLocaleDateString(
+                          "es-ES"
+                        )}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-gray-400" />
@@ -286,5 +411,5 @@ export default function MapEventsPage() {
         </div>
       </div>
     </Layout>
-  )
+  );
 }

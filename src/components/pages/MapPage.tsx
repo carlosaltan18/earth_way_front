@@ -1,321 +1,219 @@
-"use client"
+"use client";
+import { useState, useMemo, useRef, useCallback } from "react";
+import dynamic from "next/dynamic";
+import type { Map as LeafletMap } from "leaflet";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGetEvents } from "@/features/event/queries";
+import { useGetReports } from "@/features/report/queries";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useAuth } from "@/contexts/AuthContext"
-import Layout from "@/components/layout/Layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MapPin, Calendar, Users, TreePine, Trash2, GraduationCap, Shield } from "lucide-react"
-import dynamic from "next/dynamic"
-
-interface MapLocation {
-  id: string
-  name: string
-  type: "event" | "report"
-  category: "reforestation" | "cleanup" | "education" | "conservation"
-  lat: number
-  lng: number
-  address: string
-  date: string
-  description: string
-  organizationName?: string
-  status: "active" | "completed" | "pending"
-}
-
-// Mock map data
-const mockLocations: MapLocation[] = [
-  {
-    id: "1",
-    name: "Reforestación Cerro Verde",
-    type: "event",
-    category: "reforestation",
-    lat: -12.0464,
-    lng: -77.0428,
-    address: "Cerro Verde, Lima, Perú",
-    date: "2024-02-15",
-    description: "Jornada de plantación de árboles nativos",
-    organizationName: "EcoLima",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Limpieza Playa Costa Verde",
-    type: "event",
-    category: "cleanup",
-    lat: -12.1167,
-    lng: -77.0167,
-    address: "Costa Verde, Miraflores, Lima",
-    date: "2024-02-20",
-    description: "Actividad de limpieza y concientización ambiental",
-    organizationName: "OceanGuard",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Deforestación Ilegal Detectada",
-    type: "report",
-    category: "conservation",
-    lat: -12.2,
-    lng: -77.1,
-    address: "Zona Protegida Norte",
-    date: "2024-01-25",
-    description: "Reporte de tala ilegal en zona protegida",
-    status: "pending",
-  },
-  {
-    id: "4",
-    name: "Contaminación Río Rímac",
-    type: "report",
-    category: "cleanup",
-    lat: -12.03,
-    lng: -77.08,
-    address: "Río Rímac, Sector Industrial",
-    date: "2024-01-20",
-    description: "Vertido de residuos industriales detectado",
-    status: "pending",
-  },
-]
-
-const categoryIcons = {
-  reforestation: TreePine,
-  cleanup: Trash2,
-  education: GraduationCap,
-  conservation: Shield,
-}
-
-const categoryColors = {
-  reforestation: "bg-green-100 text-green-800",
-  cleanup: "bg-blue-100 text-blue-800",
-  education: "bg-purple-100 text-purple-800",
-  conservation: "bg-orange-100 text-orange-800",
-}
-
-const statusColors = {
-  active: "bg-green-100 text-green-800",
-  completed: "bg-gray-100 text-gray-800",
-  pending: "bg-yellow-100 text-yellow-800",
-}
-
-const statusLabels = {
-  active: "Activo",
-  completed: "Completado",
-  pending: "Pendiente",
-}
-
-const categoryMarkerColors = {
-  reforestation: "green",
-  cleanup: "blue",
-  education: "purple",
-  conservation: "orange",
-}
-
-// Componente del mapa dinámico (solo se carga en cliente)
+// Importación dinámica
 const MapComponentDynamic = dynamic(
-  () => import("@/components/map/MapWithMarkers").then((mod) => mod.default),
-  { 
-    ssr: false, 
+  () => import("@/components/map/MapWithMarkers"),
+  {
+    ssr: false,
     loading: () => (
-      <div className="w-full h-[500px] bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-gray-500">Cargando mapa...</p>
+      <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+          <p className="text-gray-600 mt-3">Inicializando mapa...</p>
+        </div>
       </div>
     ),
   }
-)
+);
+
+/* const MapComponentDynamic = function MapComponentDynamic(props: any) {
+  return(
+    <div>hola</div>
+  )
+} */
 
 export default function MapPage() {
-  const { user, isAuthenticated } = useAuth()
-  const [locations, setLocations] = useState<MapLocation[]>(mockLocations)
-  const [selectedType, setSelectedType] = useState<"all" | "event" | "report">("all")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(null)
+  const { user, isAuthenticated } = useAuth();
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
 
-  const filteredLocations = locations.filter((location) => {
-    const matchesType = selectedType === "all" || location.type === selectedType
-    const matchesCategory = selectedCategory === "all" || location.category === selectedCategory
-    return matchesType && matchesCategory
-  })
+  // Obtener datos
+  const queryEvents = useGetEvents();
+  /* const { data: reportsResponse, isLoading: loadingReports } =
+    useGetReports?.() ?? { data: undefined, isLoading: false }; */
+
+  // Normalizar datos
+
+  /* const reports = useMemo(() => {
+    if (!reportsResponse) return [];
+    return Array.isArray(reportsResponse)
+      ? reportsResponse
+      : (reportsResponse as any)?.items ?? [];
+  }, [reportsResponse]); */
+
+  // Crear puntos del mapa
+  const points = useMemo(() => {
+    if (!queryEvents.data) return [];
+    console.log("Datos de eventos:", queryEvents.data);
+    const eventPoints = queryEvents.data.payload
+      .filter((e: any) => e?.latitude != null && e?.longitude != null)
+      .map((e: any) => ({
+        id: `event-${e.id}`,
+        type: "event" as const,
+        title: e.name || "Evento sin nombre",
+        subtitle: e.direction || e.description || "",
+        lat: Number(e.latitude),
+        lng: Number(e.longitude),
+        raw: e,
+      }));
+
+    /* const reportPoints = reports
+      .filter((r: any) => r?.latitude != null && r?.longitude != null)
+      .map((r: any) => ({
+        id: `report-${r.id}`,
+        type: "report" as const,
+        title: r.title || `Reporte ${r.id}`,
+        subtitle: r.description || "",
+        lat: Number(r.latitude),
+        lng: Number(r.longitude),
+        raw: r,
+      })); */
+
+    return [...eventPoints];
+  }, [queryEvents.data]);
+
+  // Centro inicial
+  const initialCenter: [number, number] = useMemo(() => {
+    if (points.length > 0) {
+      return [points[0].lat, points[0].lng];
+    }
+    // Coordenadas de Lima, Perú por defecto
+    return [-12.0464, -77.0428];
+  }, [points]);
+
+  // Callback para cuando el mapa esté listo
+  /* const handleMapReady = useCallback((map: LeafletMap) => {
+    mapInstanceRef.current = map;
+    setMapReady(true);
+    console.log("Mapa inicializado correctamente");
+  }, []); */
+
+  // Función para enfocar en un punto
+  const focusOn = useCallback((lat: number, lng: number, zoom = 15) => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([lat, lng], zoom, {
+        animate: true,
+        duration: 0.5,
+      });
+    }
+  }, []);
 
   return (
-    <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Mapa Interactivo</h1>
-          <p className="text-gray-600 mt-2">Visualiza eventos ambientales y reportes geolocalizados en tiempo real</p>
-        </div>
+    <div className="flex h-screen overflow-hidden">
+      {/* Lista lateral */}
+      <aside className="w-80 overflow-y-auto border-r bg-white shadow-sm">
+        <div className="p-4">
+          <div className="mb-4">
+            <h2 className="font-bold text-xl text-gray-900">
+              Mapa Interactivo
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Ubicaciones ({points.length})
+            </p>
+          </div>
 
-        {!isAuthenticated && (
-          <Card className="mb-6 bg-green-50 border-green-200">
-            <CardContent className="p-4">
-              <div className="text-center">
-                <p className="text-green-700 mb-3">
-                  <strong>¿Quieres reportar eventos ambientales?</strong> Regístrate para contribuir con la comunidad.
-                </p>
-                <div className="flex justify-center gap-3">
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white bg-transparent"
-                  >
-                    <Link href="/auth/login">Iniciar Sesión</Link>
-                  </Button>
-                  <Button asChild size="sm" className="bg-green-600 hover:bg-green-700">
-                    <Link href="/auth/register">Registrarse</Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Map */}
-          <div className="lg:col-span-2">
-            <Card className="h-[600px]">
-              <CardHeader>
-                <CardTitle>Mapa de Eventos y Reportes</CardTitle>
-                <CardDescription>Mapa interactivo con ubicaciones de eventos y reportes ambientales</CardDescription>
-              </CardHeader>
-              <CardContent className="h-full p-0 border-t">
-                <MapComponentDynamic
-                  locations={filteredLocations}
-                  selectedLocation={selectedLocation}
-                  onLocationSelect={setSelectedLocation}
+          {queryEvents.isLoading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <p className="text-gray-500 mt-3">Cargando datos...</p>
+            </div>
+          ) : points.length === 0 ? (
+            <div className="text-center py-12">
+              <svg
+                className="mx-auto h-12 w-12 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
                 />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Filters */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Filtros</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Tipo</label>
-                  <Select value={selectedType} onValueChange={(value: any) => setSelectedType(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="event">Eventos</SelectItem>
-                      <SelectItem value="report">Reportes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Categoría</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="reforestation">Reforestación</SelectItem>
-                      <SelectItem value="cleanup">Limpieza</SelectItem>
-                      <SelectItem value="education">Educación</SelectItem>
-                      <SelectItem value="conservation">Conservación</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Locations List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Ubicaciones ({filteredLocations.length})</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
-                {filteredLocations.map((location) => {
-                  const IconComponent = categoryIcons[location.category]
-                  return (
+              </svg>
+              <p className="text-gray-500 mt-3">
+                No hay ubicaciones disponibles
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {points.map((p) => (
+                <button
+                  key={p.id}
+                  className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-500 transition-all duration-200 group"
+                  onClick={() => focusOn(p.lat, p.lng)}
+                >
+                  <div className="flex items-start gap-3">
                     <div
-                      key={location.id}
-                      className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 ${
-                        selectedLocation?.id === location.id ? "border-green-500 bg-green-50" : "border-gray-200"
+                      className={`mt-1 p-2 rounded-lg ${
+                        p.type === "event" ? "bg-blue-100" : "bg-orange-100"
                       }`}
-                      onClick={() => setSelectedLocation(location)}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-gray-100">
-                          <IconComponent className="h-4 w-4" />
+                      <svg
+                        className={`h-4 w-4 ${
+                          p.type === "event"
+                            ? "text-blue-600"
+                            : "text-orange-600"
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 group-hover:text-green-700 transition-colors">
+                        {p.title}
+                      </div>
+                      {p.subtitle && (
+                        <div className="text-xs text-gray-600 mt-1 line-clamp-2">
+                          {p.subtitle}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{location.name}</h4>
-                          <p className="text-xs text-gray-500 mt-1">{location.address}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge className={`text-xs ${categoryColors[location.category]}`}>
-                              {location.category}
-                            </Badge>
-                            <Badge className={`text-xs ${statusColors[location.status]}`}>
-                              {statusLabels[location.status]}
-                            </Badge>
-                          </div>
-                        </div>
+                      )}
+                      <div
+                        className={`inline-block text-xs font-medium mt-2 px-2 py-1 rounded ${
+                          p.type === "event"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-orange-100 text-orange-700"
+                        }`}
+                      >
+                        {p.type === "event" ? "Evento" : "Reporte"}
                       </div>
                     </div>
-                  )
-                })}
-
-                {filteredLocations.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>No hay ubicaciones que coincidan con los filtros</p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Selected Location Details */}
-            {selectedLocation && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">{selectedLocation.name}</CardTitle>
-                  <div className="flex gap-2">
-                    <Badge className={categoryColors[selectedLocation.category]}>{selectedLocation.category}</Badge>
-                    <Badge className={statusColors[selectedLocation.status]}>
-                      {statusLabels[selectedLocation.status]}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-gray-600">{selectedLocation.description}</p>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span>{selectedLocation.address}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <span>{new Date(selectedLocation.date).toLocaleDateString("es-ES")}</span>
-                    </div>
-                    {selectedLocation.organizationName && (
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-gray-400" />
-                        <span>{selectedLocation.organizationName}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {selectedLocation.type === "event" && selectedLocation.status === "active" && (
-                    <Button className="w-full mt-4">Ver Detalles del Evento</Button>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-    </Layout>
-  )
+      </aside>
+
+      {/* Mapa */}
+      <main className="flex-1 relative">
+        <MapComponentDynamic
+          points={points}
+          initialCenter={initialCenter}
+          onMapReady={() => {}}
+        />
+      </main>
+    </div>
+  );
 }
