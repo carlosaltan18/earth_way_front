@@ -18,6 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Edit, Trash2, Search, Calendar, User } from "lucide-react"
 import Link from "next/link"
+import {useEffect} from "react"
 
 interface Post {
   id: string
@@ -66,7 +67,7 @@ const mockPosts: Post[] = [
 export default function PostsPage() {
   const { user, isAuthenticated } = useAuth()
   const { toast } = useToast()
-  const [posts, setPosts] = useState<Post[]>(mockPosts)
+  const [posts, setPosts] = useState<Post[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingPost, setEditingPost] = useState<Post | null>(null)
@@ -152,6 +153,38 @@ export default function PostsPage() {
   const canEditPost = (post: Post) =>
   isAuthenticated && (user?.id === post.authorId || (user?.roles ?? []).includes("ROLE_ADMIN"));
 
+  useEffect(() => {
+  const fetchPosts = async () => {
+    try {
+      const response = await fetch("http://localhost:8080/api/v1/post/listPost") // 🔹 cambia el puerto si es distinto
+      if (!response.ok) {
+        throw new Error("Error al obtener publicaciones")
+      }
+
+      const data = await response.json()
+      const postsFromDb = data.payload.map((post: any) => ({
+        id: post.id.toString(),
+        title: post.title,
+        content: post.content,
+        postDate: post.postDate,
+        authorId: post.author?.id || "",
+        authorName: `${post.author?.name || ""} ${post.author?.surname || ""}`.trim() || "Autor desconocido",
+        images: post.images || [],
+      }))
+
+      setPosts(postsFromDb)
+    } catch (error) {
+      console.error("Error cargando publicaciones:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las publicaciones.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  fetchPosts()
+}, [])
 
   return (
     <Layout>
