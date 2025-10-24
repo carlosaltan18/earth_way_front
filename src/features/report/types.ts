@@ -13,6 +13,13 @@ export type Report = {
   location?: Location | null
 }
 
+export type CreateReportRequest = {
+  title: string
+  description: string
+  latitude: number
+  longitude: number
+}
+
 export type Sort = {
   empty: boolean
   sorted: boolean

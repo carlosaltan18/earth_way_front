@@ -1,5 +1,5 @@
 import { api, ApiError } from "@/lib/api";
-import type { Report, GetReportsParams, GetReportsResponse } from "./types";
+import type { Report, GetReportsParams, GetReportsResponse, CreateReportRequest } from "./types";
 
 export const reportApi = {
   list: async (params?: GetReportsParams): Promise<GetReportsResponse> => {
@@ -20,7 +20,7 @@ export const reportApi = {
     }
   },
 
-  create: async (report: Omit<Report, "id">): Promise<Report> => {
+  create: async (report: CreateReportRequest): Promise<Report> => {
     try {
       const response = await api.post("/report", report);
       return response.data;
