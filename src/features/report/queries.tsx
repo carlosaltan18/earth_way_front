@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reportApi } from "./api";
-import type { Report, GetReportsParams } from "./types";
+import type { Report, GetReportsParams, CreateReportRequest } from "./types";
 
 export const reportKeys = {
   all: ["reports"] as const,
@@ -29,7 +29,7 @@ export const useCreateReport = () => {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: (report: Omit<Report, "id">) => reportApi.create(report),
+    mutationFn: (report: CreateReportRequest) => reportApi.create(report),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reportKeys.lists() });
     },
