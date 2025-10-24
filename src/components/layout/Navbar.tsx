@@ -43,9 +43,10 @@ export default function Navbar() {
   }, [])
 
   return (
-    <nav className="bg-white shadow-sm border-b">
+    <nav className="bg-white shadow-sm border-b w-full z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between h-16 items-center">
+          {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
               <Leaf className="h-8 w-8 text-green-600" />
@@ -54,7 +55,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
             <Link href="/posts" className="text-gray-700 hover:text-green-600 transition-colors">
               Publicaciones
             </Link>
@@ -78,7 +79,7 @@ export default function Navbar() {
                 <Link href="/map-reports" className="text-gray-700 hover:text-green-600 transition-colors">
                   Mapa Reportes
                 </Link>
-                {(hasRole("ROLE_ADMIN") || hasRole("ROLE_ORGANIZATION")) && (
+                {(hasRole("ROLE_ORGANIZATION")) && (
                   <Link href="/dashboard" className="text-gray-700 hover:text-green-600 transition-colors">
                     Dashboard
                   </Link>
@@ -87,8 +88,8 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* User Menu */}
-          <div ref={menuRef} className="flex items-center space-x-4">
+          {/* User Menu & Mobile Button */}
+          <div ref={menuRef} className="flex items-center space-x-2">
             {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -122,7 +123,6 @@ export default function Navbar() {
                       </Link>
                     </DropdownMenuItem>
                   )}
-                  
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
@@ -132,10 +132,10 @@ export default function Navbar() {
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" asChild>
+                <Button variant="ghost" asChild className="px-2">
                   <Link href="/auth/login">Iniciar Sesión</Link>
                 </Button>
-                <Button asChild>
+                <Button asChild className="px-2">
                   <Link href="/auth/register">Registrarse</Link>
                 </Button>
               </div>
@@ -143,7 +143,7 @@ export default function Navbar() {
 
             {/* Mobile menu button */}
             <div className="md:hidden">
-              <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Menú">
                 {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </Button>
             </div>
@@ -152,7 +152,7 @@ export default function Navbar() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden">
+          <div className="md:hidden absolute left-0 right-0 top-16 bg-white shadow-lg border-b z-40">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
               <Link href="/posts" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Publicaciones</Link>
               <Link href="/map" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Mapa</Link>
@@ -168,6 +168,22 @@ export default function Navbar() {
                   )}
                 </>
               )}
+              <div className="mt-2 flex flex-col gap-2">
+                {!isAuthenticated ? (
+                  <>
+                    <Button variant="outline" asChild className="w-full">
+                      <Link href="/auth/login" onClick={() => setIsMenuOpen(false)}>Iniciar Sesión</Link>
+                    </Button>
+                    <Button asChild className="w-full">
+                      <Link href="/auth/register" onClick={() => setIsMenuOpen(false)}>Registrarse</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="outline" className="w-full" onClick={handleLogout}>
+                    Cerrar Sesión
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}

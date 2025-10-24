@@ -1,8 +1,8 @@
 import { api, ApiError } from "@/lib/api";
-import type { UserType, GetUsersParams, ChangePasswordPayload } from "./types";
+import type { UserType as User, GetUsersParams, ChangePasswordPayload, PaginatedUsersResponse } from "./types";
 
 export const userApi = {
-  getUsers: async (params?: GetUsersParams): Promise<UserType[]> => {
+  getUsers: async (params?: GetUsersParams): Promise<PaginatedUsersResponse> => {
     try {
       const response = await api.get("/user/get-user", { params });
       return response.data;
@@ -11,7 +11,7 @@ export const userApi = {
     }
   },
 
-  getUser: async (idUser: number): Promise<UserType> => {
+  getUser: async (idUser: number): Promise<User> => {
     try {
       const response = await api.get(`/user/get-user/${idUser}`);
       return response.data;
@@ -20,7 +20,7 @@ export const userApi = {
     }
   },
 
-  updateCurrentUser: async (user: Partial<UserType>): Promise<UserType> => {
+  updateCurrentUser: async (user: Partial<User>): Promise<User> => {
     try {
       const response = await api.put("/user/update", user);
       return response.data;
@@ -29,7 +29,7 @@ export const userApi = {
     }
   },
 
-  updateUserById: async (idUser: number, user: Partial<UserType>): Promise<UserType> => {
+  updateUserById: async (idUser: number, user: Partial<User>): Promise<User> => {
     try {
       const response = await api.put(`/user/update/${idUser}`, user);
       return response.data;
@@ -53,4 +53,5 @@ export const userApi = {
       throw ApiError.fromAxiosError(err);
     }
   },
+
 };
