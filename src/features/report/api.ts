@@ -1,8 +1,8 @@
 import { api, ApiError } from "@/lib/api";
-import type { Report, GetReportsParams } from "./types";
+import type { Report, GetReportsParams, GetReportsResponse } from "./types";
 
 export const reportApi = {
-  list: async (params?: GetReportsParams): Promise<Report[]> => {
+  list: async (params?: GetReportsParams): Promise<GetReportsResponse> => {
     try {
       const response = await api.get("/report", { params });
       return response.data;
