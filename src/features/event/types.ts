@@ -22,3 +22,14 @@ export type Participant = {
   userId: number;
   eventId: number;
 };
+
+
+// Tipo para la respuesta paginada de la API (estructura real)
+export type PaginatedEventsResponse = {
+  payload: Event[];
+  totalPages: number;
+  message: string;
+  currentPage: number;
+  events: Event[]; // Duplicado en la respuesta
+  totalElements: number;
+};
