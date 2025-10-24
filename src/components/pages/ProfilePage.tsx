@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useRouter } from "next/navigation";
 import type { UserType } from "@/features/user/types"
-import {useDeleteCurrentUser, useUpdateCurrentUser, useChangePassword} from "@/features/user/queries"
+import { useDeleteCurrentUser, useUpdateCurrentUser, useChangePassword } from "@/features/user/queries"
 import { useState } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/layout/Layout"
@@ -69,8 +69,11 @@ export default function ProfilePage() {
   const router = useRouter();
 
 
-    // Mutation para actualizar usuario
-const { mutateAsync: updatePassword } = useChangePassword();
+  // Mutation para actualizar usuario
+  const { mutateAsync: updatePassword } = useChangePassword();
+
+  //Mutation para actualizar usuario
+  const { mutateAsync: updateUser } = useUpdateCurrentUser();
 
   // Mutation para eliminar usuario actual
   const { mutate: deleteUser, isPending: isDeleting } = useDeleteCurrentUser();
@@ -78,6 +81,7 @@ const { mutateAsync: updatePassword } = useChangePassword();
   // Personal info form state
   const [personalInfo, setPersonalInfo] = useState({
     name: user?.name || "",
+    surname: user?.surname || "",
     email: user?.email || "",
     phone: user?.phone || "",
   })
@@ -97,7 +101,20 @@ const { mutateAsync: updatePassword } = useChangePassword();
 
     try {
       // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await updateUser({
+        name: personalInfo.name,
+        surname: personalInfo.surname,
+        email: personalInfo.email,
+        phone: personalInfo.phone,
+      });
+
+      setPersonalInfo({
+        name: user?.name || "",
+        surname: user?.surname || "",
+        email: user?.email || "",
+        phone: user?.phone || "",
+      })
+      
 
       toast({
         title: "Perfil actualizado",
@@ -139,10 +156,10 @@ const { mutateAsync: updatePassword } = useChangePassword();
 
     try {
       // Simulate API call
-     await updatePassword({
-      newPassword: passwordForm.newPassword, // si tu payload lo requiere
-      confirmPassword: passwordForm.confirmPassword,
-    });
+      await updatePassword({
+        newPassword: passwordForm.newPassword, // si tu payload lo requiere
+        confirmPassword: passwordForm.confirmPassword,
+      });
       setPasswordForm({
         newPassword: "",
         confirmPassword: "",
@@ -163,33 +180,33 @@ const { mutateAsync: updatePassword } = useChangePassword();
     }
   }
 
- const handleDeleteAccount = () => {
-  setIsLoading(true)
+  const handleDeleteAccount = () => {
+    setIsLoading(true)
 
-  deleteUser(undefined, {
-    onSuccess: () => {
-      toast({
-        title: "Cuenta eliminada",
-        description: "Tu cuenta ha sido eliminada exitosamente.",
-      })
+    deleteUser(undefined, {
+      onSuccess: () => {
+        toast({
+          title: "Cuenta eliminada",
+          description: "Tu cuenta ha sido eliminada exitosamente.",
+        })
 
-      // Logout y redirección
-      logout()
-      router.push("/auth/register");
+        // Logout y redirección
+        logout()
+        router.push("/auth/register");
 
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar tu cuenta. Intenta de nuevo.",
-        variant: "destructive",
-      })
-    },
-    onSettled: () => {
-      setIsLoading(false)
-    },
-  })
-}
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar tu cuenta. Intenta de nuevo.",
+          variant: "destructive",
+        })
+      },
+      onSettled: () => {
+        setIsLoading(false)
+      },
+    })
+  }
 
 
   const handleSettingsSubmit = async (e: React.FormEvent) => {
@@ -279,6 +296,15 @@ const { mutateAsync: updatePassword } = useChangePassword();
                           placeholder="Tu nombre completo"
                         />
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Apellido </Label>
+                        <Input
+                          id="surname"
+                          value={personalInfo.surname}
+                          onChange={(e) => setPersonalInfo((prev) => ({ ...prev, surname: e.target.value }))}
+                          placeholder="Tu apellido"
+                        />
+                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="email">Correo electrónico</Label>
@@ -298,7 +324,7 @@ const { mutateAsync: updatePassword } = useChangePassword();
                           type="tel"
                           value={personalInfo.phone}
                           onChange={(e) => setPersonalInfo((prev) => ({ ...prev, phone: e.target.value }))}
-                          placeholder="+1234567890"
+                          placeholder="00000000"
                         />
                       </div>
 
@@ -423,12 +449,8 @@ const { mutateAsync: updatePassword } = useChangePassword();
                           <AlertDialogHeader>
                             <AlertDialogTitle>¿Estás absolutamente seguro?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta y removerá
-                              todos tus datos de nuestros servidores, incluyendo:
+                              Esta acción no se puede deshacer. Esto eliminará permanentemente tu cuenta, incluyendo:
                               <br />
-                              <br />• Todas tus publicaciones 
-                              <br />• Tu participación en eventos 
-                              <br />• Tus reportes ambientales 
                               <br />• Tu información de perfil y configuraciones
                             </AlertDialogDescription>
                           </AlertDialogHeader>

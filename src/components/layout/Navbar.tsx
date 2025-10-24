@@ -73,12 +73,20 @@ export default function Navbar() {
                 <Link href="/reports" className="text-gray-700 hover:text-green-600 transition-colors">
                   Reportes
                 </Link>
-                <Link href="/map-events" className="text-gray-700 hover:text-green-600 transition-colors">
-                  Mapa Eventos
-                </Link>
-                <Link href="/map-reports" className="text-gray-700 hover:text-green-600 transition-colors">
-                  Mapa Reportes
-                </Link>
+                {
+                  /**
+                   * 
+                   * 
+                   *  <Link href="/map-events" className="text-gray-700 hover:text-green-600 transition-colors">
+                         Mapa Eventos
+                      </Link>
+                      <Link href="/map-reports" className="text-gray-700 hover:text-green-600 transition-colors">
+                        Mapa Reportes
+                      </Link>
+                   * 
+                   */
+
+                }
                 {(hasRole("ROLE_ORGANIZATION")) && (
                   <Link href="/dashboard" className="text-gray-700 hover:text-green-600 transition-colors">
                     Dashboard
