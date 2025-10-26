@@ -1,6 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { eventApi } from "./api";
-import type { Event, GetEventsParams } from "./types";
+import type { Event, GetEventsParams, PaginatedEventsResponse } from "./types";
 
 export const eventKeys = {
   all: ["events"] as const,
@@ -8,14 +13,17 @@ export const eventKeys = {
   list: (params?: GetEventsParams) => [...eventKeys.lists(), params] as const,
   details: () => [...eventKeys.all, "detail"] as const,
   detail: (id: number) => [...eventKeys.details(), id] as const,
-  participants: (eventId: number) => [...eventKeys.all, "participants", eventId] as const,
-  participantsCount: (eventId: number) => [...eventKeys.all, "participants-count", eventId] as const,
+  participants: (eventId: number) =>
+    [...eventKeys.all, "participants", eventId] as const,
+  participantsCount: (eventId: number) =>
+    [...eventKeys.all, "participants-count", eventId] as const,
 };
 
 export const useGetEvents = (params?: GetEventsParams) => {
-  return useQuery({
+  return useQuery<PaginatedEventsResponse, Error>({
     queryKey: eventKeys.list(params),
     queryFn: () => eventApi.list(params),
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -42,8 +50,13 @@ export const useUpdateEvent = () => {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ idEvent, event }: { idEvent: number; event: Omit<Event, "id"> }) =>
-      eventApi.update(idEvent, event),
+    mutationFn: ({
+      idEvent,
+      event,
+    }: {
+      idEvent: number;
+      event: Omit<Event, "id">;
+    }) => eventApi.update(idEvent, event),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: eventKeys.detail(variables.idEvent) });
       qc.invalidateQueries({ queryKey: eventKeys.lists() });
