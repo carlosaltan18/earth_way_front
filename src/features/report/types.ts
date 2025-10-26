@@ -11,6 +11,8 @@ export type Report = {
   author: string
   done: boolean
   location?: Location | null
+  latitude?: number
+  longitude?: number
 }
 
 export type CreateReportRequest = {

@@ -1652,7 +1652,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                             <Label className="mb-2 block">Ubicación *</Label>
                             <MapLocationPicker
                               selectedLocation={reportForm.location}
-                              onLocationSelect={(location) =>
+                              onLocationSelect={(location: { lat: number; lng: number } | null) =>
                                 setReportForm((prev) => ({ ...prev, location }))
                               }
                               height="350px"
