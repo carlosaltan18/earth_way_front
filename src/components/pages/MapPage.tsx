@@ -129,8 +129,8 @@ export default function MapPage() {
   const filteredPoints = useMemo(() => {
     return points.filter((p) => {
       const typeMatch = filterType === "all" || p.type === filterType;
-      const categoryMatch = filterCategory === "all" || p.category === filterCategory;
-      return typeMatch && categoryMatch;
+      //const categoryMatch = filterCategory === "all" || p.category === filterCategory;
+      return typeMatch;
     });
   }, [points, filterType, filterCategory]);
 
@@ -197,8 +197,8 @@ export default function MapPage() {
           <div className="lg:col-span-2">
             <Card className="h-[600px] flex flex-col">
               <CardHeader>
-                <CardTitle>Mapa de Eventos</CardTitle>
-                <CardDescription>Ubicaciones de eventos ambientales</CardDescription>
+                <CardTitle>Mapa de Eventos y Reportes</CardTitle>
+                <CardDescription>Ubicaciones de actividades ambientales</CardDescription>
               </CardHeader>
               <CardContent className="flex-1 p-0 border-t overflow-hidden">
                 <MapComponentDynamic
@@ -272,8 +272,8 @@ export default function MapPage() {
                   </div>
                 ) : (
                   filteredPoints.map((point) => {
-                    const category = (point.category || "reforestation") as Category;
-                    const IconComponent = point.type === "event" ? categoryIcons[category] : MapPin;
+                    //const category = (point.category || "reforestation") as Category;
+                    //const IconComponent = point.type === "event" ? categoryIcons[category] : MapPin;
                     return (
                       <div
                         key={point.id}
@@ -285,9 +285,9 @@ export default function MapPage() {
                         onClick={() => handlePointSelect(point)}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-gray-100">
+                          {/* <div className="p-2 rounded-lg bg-gray-100">
                             <IconComponent className="h-4 w-4 text-gray-600" />
-                          </div>
+                          </div> */}
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium text-sm truncate">{point.title}</h4>
                             <p className="text-xs text-gray-500 mt-1 line-clamp-2">{point.subtitle}</p>

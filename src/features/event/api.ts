@@ -5,7 +5,7 @@ import { PaginatedUsersResponse } from "../user/types";
 export const eventApi = {
   list: async (params?: GetEventsParams): Promise<PaginatedEventsResponse> => {
     try {
-      const response = await api.get("/event/", { params });
+      const response = await api.get("/event", { params });
       return response.data;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
