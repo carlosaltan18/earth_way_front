@@ -3,10 +3,12 @@
 import type { UserType, PaginatedUsersResponse } from "@/features/user/types"
 import { useAddRoleToUser, useRemoveRoleFromUser, useGetRoles } from "@/features/role/queries"
 import { useGetUsers } from "@/features/user/queries"
+import { useCreateReport, useGetReports, useDeleteReport, usePatchReport, useUpdateReport } from "@/features/report/queries"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/layout/Layout"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
+import dynamic from "next/dynamic"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -123,9 +125,25 @@ interface DashboardReport {
   done: boolean
   category: "pollution" | "deforestation" | "wildlife" | "waste"
   severity: "low" | "medium" | "high"
+  latitude?: number
+  longitude?: number
 }
 
-
+// Importación dinámica del mapa
+const MapLocationPicker = dynamic(
+  () => import("@/components/map/MapLocationPicker"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[300px] bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          <p className="text-gray-500 mt-2 text-sm">Cargando mapa...</p>
+        </div>
+      </div>
+    ),
+  }
+) as any;
 
 const mockEvents: DashboardEvent[] = [
   {
@@ -272,10 +290,21 @@ export default function DashboardPage() {
     isSuccess
   } = useGetUsers({ page, size })
 
+  const {
+    data: reportsData,
+    isLoading: isLoadingReports,
+    error: reportsError,
+    refetch: refetchReports
+  } = useGetReports()
+
   // Get available roles
 const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
   const { mutate: addRole, isPending: isAddingRole } = useAddRoleToUser()
   const { mutate: removeRole, isPending: isRemovingRole } = useRemoveRoleFromUser()
+  const { mutate: createReport, isPending: isCreatingReport } = useCreateReport()
+  const { mutate: deleteReport, isPending: isDeletingReport } = useDeleteReport()
+  const { mutate: patchReport, isPending: isPatchingReport } = usePatchReport()
+  const { mutate: updateReport, isPending: isUpdatingReport } = useUpdateReport()
 
 
 
@@ -303,6 +332,35 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
     }
   }, [usersData])
 
+  // Listar Reportes desde la API
+  useEffect(() => {
+    if (reportsData?.content && Array.isArray(reportsData.content)) {
+      const mappedReports: DashboardReport[] = reportsData.content.map((report: any) => {
+
+        const address = report.location
+          ? `Lat: ${report.location.latitude.toFixed(4)}, Lng: ${report.location.longitude.toFixed(4)}`
+          : "Sin ubicación";
+
+        return {
+          id: report.id.toString(),
+          title: report.title,
+          description: report.description,
+          date: report.date,
+          address: address,
+          authorId: report.author,
+          authorName: report.author,
+          done: report.done,
+          latitude: report.location?.latitude,
+          longitude: report.location?.longitude,
+          // Como el backend no devuelve category y severity, usamos valores por defecto
+          category: "pollution" as const,
+          severity: "medium" as const,
+        };
+      });
+
+      setReports(mappedReports)
+    }
+  }, [reportsData])
 
   // Manejo de errores
   useEffect(() => {
@@ -315,6 +373,17 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
       })
     }
   }, [usersError, toast])
+
+  useEffect(() => {
+    if (reportsError) {
+      console.error('Error loading reports:', reportsError)
+      toast({
+        title: "Error",
+        description: `No se pudieron cargar los reportes: ${reportsError.message}`,
+        variant: "destructive",
+      })
+    }
+  }, [reportsError, toast])
 
   // Handle role change
   const handleAddRole = (roleName: string) => {
@@ -406,11 +475,13 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false)
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false)
   const [isOrgDialogOpen, setIsOrgDialogOpen] = useState(false)
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
 
   // Edit states
   const [editingUser, setEditingUser] = useState<DashboardUser | null>(null)
   const [editingEvent, setEditingEvent] = useState<DashboardEvent | null>(null)
   const [editingOrg, setEditingOrg] = useState<DashboardOrganization | null>(null)
+  const [editingReport, setEditingReport] = useState<DashboardReport | null>(null)
 
   // Form states
   const [userForm, setUserForm] = useState({
@@ -437,6 +508,12 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
     address: "",
     category: "" as DashboardOrganization["category"] | "",
     founded: "",
+  })
+
+  const [reportForm, setReportForm] = useState({
+    title: "",
+    description: "",
+    location: null as { lat: number; lng: number } | null,
   })
 
   // Filter functions
@@ -706,24 +783,144 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
   }
 
   // CRUD Functions for Reports
-  const handleToggleReportStatus = (reportId: string) => {
-    setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, done: !r.done } : r)))
+  const handleCreateReport = () => {
+    if (!reportForm.title.trim() || !reportForm.description.trim() || !reportForm.location) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos y selecciona una ubicación en el mapa.",
+        variant: "destructive",
+      })
+      return
+    }
 
+    createReport(
+      {
+        title: reportForm.title,
+        description: reportForm.description,
+        latitude: reportForm.location.lat,
+        longitude: reportForm.location.lng,
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Reporte creado",
+            description: "El reporte ha sido creado exitosamente.",
+          })
+          setReportForm({ title: "", description: "", location: null })
+          setIsReportDialogOpen(false)
+          refetchReports()
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Error",
+            description: `No se pudo crear el reporte: ${error.message || "Error desconocido"}`,
+            variant: "destructive",
+          })
+        },
+      }
+    )
+  }
+
+  const handleToggleReportStatus = (reportId: string) => {
     const report = reports.find((r) => r.id === reportId)
-    toast({
-      title: report?.done ? "Reporte reabierto" : "Reporte completado",
-      description: report?.done
-        ? "El reporte ha sido marcado como pendiente."
-        : "El reporte ha sido marcado como completado.",
-    })
+    if (!report) return
+
+    const newStatus = !report.done
+
+    patchReport(
+      { id: Number(reportId), data: { done: newStatus } },
+      {
+        onSuccess: () => {
+          toast({
+            title: newStatus ? "Reporte completado" : "Reporte reabierto",
+            description: newStatus
+              ? "El reporte ha sido marcado como completado."
+              : "El reporte ha sido marcado como pendiente.",
+          })
+          refetchReports()
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Error",
+            description: `No se pudo actualizar el estado del reporte: ${error.message || "Error desconocido"}`,
+            variant: "destructive",
+          })
+        },
+      }
+    )
   }
 
   const handleDeleteReport = (reportId: string) => {
-    setReports((prev) => prev.filter((r) => r.id !== reportId))
-    toast({
-      title: "Reporte eliminado",
-      description: "El reporte ha sido eliminado del sistema.",
+    deleteReport(Number(reportId), {
+      onSuccess: () => {
+        toast({
+          title: "Reporte eliminado",
+          description: "El reporte ha sido eliminado del sistema.",
+        })
+        refetchReports()
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: `No se pudo eliminar el reporte: ${error.message || "Error desconocido"}`,
+          variant: "destructive",
+        })
+      },
     })
+  }
+
+  const openEditReportDialog = (report: DashboardReport) => {
+    setEditingReport(report)
+    setReportForm({
+      title: report.title,
+      description: report.description,
+      location: report.latitude && report.longitude
+        ? { lat: report.latitude, lng: report.longitude }
+        : null,
+    })
+    setIsReportDialogOpen(true)
+  }
+
+  const handleEditReport = () => {
+    if (!reportForm.title.trim() || !reportForm.description.trim() || !reportForm.location || !editingReport) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos y selecciona una ubicación en el mapa.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    updateReport(
+      {
+        id: Number(editingReport.id),
+        report: {
+          title: reportForm.title,
+          description: reportForm.description,
+          latitude: reportForm.location.lat,
+          longitude: reportForm.location.lng,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Reporte actualizado",
+            description: "El reporte ha sido actualizado exitosamente.",
+          })
+          setReportForm({ title: "", description: "", location: null })
+          setEditingReport(null)
+          setIsReportDialogOpen(false)
+          refetchReports()
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Error",
+            description: `No se pudo actualizar el reporte: ${error.message || "Error desconocido"}`,
+            variant: "destructive",
+          })
+        },
+      }
+    )
   }
 
   if (!hasRole("ROLE_ADMIN") && !hasRole("ROLE_ORGANIZATION")) {
@@ -1412,8 +1609,85 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
             <TabsContent value="reports" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Gestión de Reportes</CardTitle>
-                  <CardDescription>Revisa y gestiona reportes ambientales</CardDescription>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
+                    <div>
+                      <CardTitle className="text-xl sm:text-2xl">Gestión de Reportes</CardTitle>
+                      <CardDescription className="text-sm sm:text-base">Revisa y gestiona reportes ambientales</CardDescription>
+                    </div>
+                    <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full sm:w-auto">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Crear Reporte
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>{editingReport ? "Editar Reporte" : "Crear Nuevo Reporte"}</DialogTitle>
+                          <DialogDescription>
+                            {editingReport
+                              ? "Actualiza la información del reporte ambiental."
+                              : "Crea un reporte ambiental. Selecciona la ubicación en el mapa."}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label>Título del reporte</Label>
+                            <Input
+                              value={reportForm.title}
+                              onChange={(e) => setReportForm((prev) => ({ ...prev, title: e.target.value }))}
+                              placeholder="Ej: Contaminación en río"
+                            />
+                          </div>
+                          <div>
+                            <Label>Descripción</Label>
+                            <Textarea
+                              value={reportForm.description}
+                              onChange={(e) => setReportForm((prev) => ({ ...prev, description: e.target.value }))}
+                              placeholder="Describe el problema ambiental..."
+                              rows={4}
+                            />
+                          </div>
+                          <div>
+                            <Label className="mb-2 block">Ubicación *</Label>
+                            <MapLocationPicker
+                              selectedLocation={reportForm.location}
+                              onLocationSelect={(location: { lat: number; lng: number } | null) =>
+                                setReportForm((prev) => ({ ...prev, location }))
+                              }
+                              height="350px"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsReportDialogOpen(false)
+                              setReportForm({ title: "", description: "", location: null })
+                              setEditingReport(null)
+                            }}
+                            disabled={isCreatingReport || isUpdatingReport}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={editingReport ? handleEditReport : handleCreateReport}
+                            disabled={isCreatingReport || isUpdatingReport}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            {editingReport
+                              ? isUpdatingReport
+                                ? "Actualizando..."
+                                : "Guardar Cambios"
+                              : isCreatingReport
+                              ? "Creando..."
+                              : "Crear Reporte"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="relative">
@@ -1426,8 +1700,28 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                     />
                   </div>
 
-                  <div className="space-y-3">
-                    {filteredReports.map((report) => (
+                  {isLoadingReports && (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                      <p className="text-gray-500">Cargando reportes...</p>
+                    </div>
+                  )}
+
+                  {reportsError && !isLoadingReports && (
+                    <div className="text-center py-8 bg-red-50 rounded-lg">
+                      <p className="text-red-500">Error al cargar reportes</p>
+                    </div>
+                  )}
+
+                  {/* Reports list */}
+                  {!isLoadingReports && !reportsError && (
+                    <div className="space-y-3">
+                      {filteredReports.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <p>No hay reportes disponibles</p>
+                        </div>
+                      ) : (
+                        filteredReports.map((report) => (
                       <Card key={report.id}>
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start">
@@ -1477,24 +1771,68 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleToggleReportStatus(report.id)}
-                                  className={
-                                    report.done
-                                      ? "text-yellow-600 hover:text-yellow-700"
-                                      : "text-green-600 hover:text-green-700"
-                                  }
+                                  onClick={() => openEditReportDialog(report)}
+                                  className="text-gray-600 hover:text-gray-900"
                                 >
-                                  {report.done ? (
-                                    <AlertTriangle className="h-4 w-4" />
-                                  ) : (
-                                    <Activity className="h-4 w-4" />
-                                  )}
+                                  <Edit className="h-4 w-4" />
                                 </Button>
                               )}
                               {hasRole("ROLE_ADMIN") && (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={
+                                        report.done
+                                          ? "text-yellow-600 hover:text-yellow-700"
+                                          : "text-green-600 hover:text-green-700"
+                                      }
+                                      disabled={isPatchingReport}
+                                    >
+                                      {report.done ? (
+                                        <AlertTriangle className="h-4 w-4" />
+                                      ) : (
+                                        <Activity className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        {report.done ? "¿Reabrir reporte?" : "¿Marcar como completado?"}
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        {report.done
+                                          ? "El reporte será marcado como pendiente nuevamente."
+                                          : "El reporte será marcado como completado y resuelto."}
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleToggleReportStatus(report.id)}
+                                        className={
+                                          report.done
+                                            ? "bg-yellow-600 hover:bg-yellow-700"
+                                            : "bg-green-600 hover:bg-green-700"
+                                        }
+                                      >
+                                        {report.done ? "Reabrir" : "Marcar como completado"}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                              {hasRole("ROLE_ADMIN") && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-red-600 hover:text-red-700"
+                                      disabled={isDeletingReport}
+                                    >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </AlertDialogTrigger>
@@ -1521,8 +1859,10 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

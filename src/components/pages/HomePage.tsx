@@ -177,7 +177,7 @@ export default function HomePage() {
                 <div className="mx-auto w-14 h-14 md:w-16 md:h-16 bg-green-600 rounded-full flex items-center justify-center mb-3 md:mb-4">
                   <TreePine className="h-7 w-7 md:h-8 md:w-8 text-white" />
                 </div>
-                <div className="text-2xl md:text-4xl font-bold text-green-600 mb-1 md:mb-2">15,000+</div>
+                <div className="text-2xl md:text-4xl font-bold text-green-600 mb-1 md:mb-2">100+</div>
                 <div className="text-gray-600 text-sm md:text-base">Árboles Plantados</div>
               </div>
 
@@ -185,7 +185,7 @@ export default function HomePage() {
                 <div className="mx-auto w-14 h-14 md:w-16 md:h-16 bg-green-600 rounded-full flex items-center justify-center mb-3 md:mb-4">
                   <Users className="h-7 w-7 md:h-8 md:w-8 text-white" />
                 </div>
-                <div className="text-2xl md:text-4xl font-bold text-green-600 mb-1 md:mb-2">2,500+</div>
+                <div className="text-2xl md:text-4xl font-bold text-green-600 mb-1 md:mb-2">150+</div>
                 <div className="text-gray-600 text-sm md:text-base">Voluntarios Activos</div>
               </div>
 
@@ -193,7 +193,7 @@ export default function HomePage() {
                 <div className="mx-auto w-14 h-14 md:w-16 md:h-16 bg-green-600 rounded-full flex items-center justify-center mb-3 md:mb-4">
                   <Globe className="h-7 w-7 md:h-8 md:w-8 text-white" />
                 </div>
-                <div className="text-2xl md:text-4xl font-bold text-green-600 mb-1 md:mb-2">50+</div>
+                <div className="text-2xl md:text-4xl font-bold text-green-600 mb-1 md:mb-2">3+</div>
                 <div className="text-gray-600 text-sm md:text-base">Organizaciones Aliadas</div>
               </div>
             </div>
