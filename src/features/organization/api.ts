@@ -1,11 +1,23 @@
 import { api, ApiError } from "@/lib/api";
 import type { Organization, GetOrganizationsParams } from "./types";
+import { isAxiosError } from "axios";
+
+interface GetOrganizationsResponse {
+  payload: Organization[];
+}
+
+interface GetOrganizationResponse {
+  payload: Organization;
+}
 
 export const organizationApi = {
   list: async (params?: GetOrganizationsParams): Promise<Organization[]> => {
     try {
-      const response = await api.get("/organization", { params });
-      return response.data;
+      const response = await api.get<GetOrganizationsResponse>(
+        "/organization",
+        { params }
+      );
+      return response.data.payload;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }
@@ -13,8 +25,10 @@ export const organizationApi = {
 
   get: async (id: number): Promise<Organization> => {
     try {
-      const response = await api.get(`/organization/${id}`);
-      return response.data;
+      const response = await api.get<GetOrganizationResponse>(
+        `/organization/${id}`
+      );
+      return response.data.payload;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }
@@ -22,17 +36,26 @@ export const organizationApi = {
 
   create: async (org: Omit<Organization, "id">): Promise<Organization> => {
     try {
-      const response = await api.post("/organization", org);
-      return response.data;
+      const response = await api.post<GetOrganizationResponse>(
+        "/organization",
+        org
+      );
+      return response.data.payload;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }
   },
 
-  update: async (id: number, org: Partial<Organization>): Promise<Organization> => {
+  update: async (
+    id: number,
+    org: Partial<Organization>
+  ): Promise<Organization> => {
     try {
-      const response = await api.put(`/organization/${id}`, org);
-      return response.data;
+      const response = await api.put<GetOrganizationResponse>(
+        `/organization/${id}`,
+        org
+      );
+      return response.data.payload;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }
@@ -48,9 +71,17 @@ export const organizationApi = {
 
   search: async (name: string): Promise<Organization[]> => {
     try {
-      const response = await api.get("/organization/search", { params: { name } });
-      return response.data;
+      const response = await api.get<GetOrganizationResponse>(
+        "/organization/search",
+        { params: { name } }
+      );
+
+      return [response.data.payload];
     } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 404) {
+        return [];
+      }
+
       throw ApiError.fromAxiosError(err);
     }
   },

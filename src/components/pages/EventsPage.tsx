@@ -1,16 +1,28 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useAuth } from "@/contexts/AuthContext"
-import Layout from "@/components/layout/Layout"
-import ProtectedRoute from "@/components/auth/ProtectedRoute"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/hooks/use-toast"
-import { Calendar, MapPin, Users, Search, Filter, Plus } from "lucide-react"
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import Layout from "@/components/layout/Layout";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar, MapPin, Users, Search, Filter, Plus } from "lucide-react";
 import {
   Dialog,
   DialogTrigger,
@@ -18,25 +30,26 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
+import { CreateEventForm } from "@/components/events/CreateEventForm";
 
 interface Event {
-  id: string
-  name: string
-  description: string
-  date: string
+  id: string;
+  name: string;
+  description: string;
+  date: string;
   location: {
-    lat: number
-    lng: number
-    address: string
-  }
-  organizationId: string
-  organizationName: string
-  participants: string[]
-  maxParticipants?: number
-  finished: boolean
-  category: "reforestation" | "cleanup" | "education" | "conservation"
-  images?: string[]
+    lat: number;
+    lng: number;
+    address: string;
+  };
+  organizationId: string;
+  organizationName: string;
+  participants: string[];
+  maxParticipants?: number;
+  finished: boolean;
+  category: "reforestation" | "cleanup" | "education" | "conservation";
+  images?: string[];
 }
 
 // Mock events data
@@ -82,7 +95,8 @@ const mockEvents: Event[] = [
   {
     id: "3",
     name: "Taller de Compostaje",
-    description: "Aprende técnicas de compostaje urbano y sostenibilidad doméstica. Incluye kit básico de compostaje.",
+    description:
+      "Aprende técnicas de compostaje urbano y sostenibilidad doméstica. Incluye kit básico de compostaje.",
     date: "2024-01-10",
     location: {
       lat: -12.05,
@@ -97,117 +111,156 @@ const mockEvents: Event[] = [
     category: "education",
     images: ["/placeholder.svg?height=300&width=500"],
   },
-]
+];
 
 const categoryLabels = {
   reforestation: "Reforestación",
   cleanup: "Limpieza",
   education: "Educación",
   conservation: "Conservación",
-}
+};
 
 const categoryColors = {
   reforestation: "bg-green-100 text-green-800",
   cleanup: "bg-blue-100 text-blue-800",
   education: "bg-purple-100 text-purple-800",
   conservation: "bg-orange-100 text-orange-800",
-}
+};
 
 export default function EventsPage() {
-  const { user, hasRole } = useAuth()
-  const { toast } = useToast()
-  const [events, setEvents] = useState<Event[]>(mockEvents)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "finished">("all")
-  const [categoryFilter, setCategoryFilter] = useState<string>("all")
-  const [isCreateEventDialogOpen, setIsCreateEventDialogOpen] = useState(false)
-
+  const { user, hasRole } = useAuth();
+  const { toast } = useToast();
+  const [events, setEvents] = useState<Event[]>(mockEvents);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "upcoming" | "finished"
+  >("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [isCreateEventDialogOpen, setIsCreateEventDialogOpen] = useState(false);
+  const userOrganizationId = user?.organizationId
+    ? Number(user.organizationId)
+    : undefined;
   const filteredEvents = events.filter((event) => {
     const matchesSearch =
       event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.organizationName.toLowerCase().includes(searchTerm.toLowerCase())
+      event.organizationName.toLowerCase().includes(searchTerm.toLowerCase());
+
+    console.log("User object from useAuth:", user); // Log the entire user object
+
+    // Check the SPECIFIC property you expect for the organization ID
+    // Replace 'organizationId' if the actual property name is different
+    const orgIdFromUser = user?.organizationId;
+    console.log("Organization ID directly from user:", orgIdFromUser);
+
+    const userOrganizationId = orgIdFromUser
+      ? Number(orgIdFromUser)
+      : undefined;
+    console.log("Processed userOrganizationId:", userOrganizationId);
 
     const matchesStatus =
       statusFilter === "all" ||
       (statusFilter === "upcoming" && !event.finished) ||
-      (statusFilter === "finished" && event.finished)
+      (statusFilter === "finished" && event.finished);
 
-    const matchesCategory = categoryFilter === "all" || event.category === categoryFilter
+    const matchesCategory =
+      categoryFilter === "all" || event.category === categoryFilter;
 
-    return matchesSearch && matchesStatus && matchesCategory
-  })
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
 
   const handleJoinEvent = (eventId: string) => {
-    const event = events.find((e) => e.id === eventId)
-    if (!event || !user) return
+    const event = events.find((e) => e.id === eventId);
+    if (!event || !user) return;
 
     if (event.participants.includes(user.id)) {
       toast({
         title: "Ya estás registrado",
         description: "Ya te has unido a este evento.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    if (event.maxParticipants && event.participants.length >= event.maxParticipants) {
+    if (
+      event.maxParticipants &&
+      event.participants.length >= event.maxParticipants
+    ) {
       toast({
         title: "Evento lleno",
         description: "Este evento ha alcanzado el máximo de participantes.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, participants: [...e.participants, user.id] } : e)))
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === eventId
+          ? { ...e, participants: [...e.participants, user.id] }
+          : e
+      )
+    );
 
     toast({
       title: "¡Te has unido al evento!",
       description: `Te has registrado exitosamente para "${event.name}".`,
-    })
-  }
+    });
+  };
 
   const handleLeaveEvent = (eventId: string) => {
-    if (!user) return
+    if (!user) return;
 
     setEvents((prev) =>
-      prev.map((e) => (e.id === eventId ? { ...e, participants: e.participants.filter((p) => p !== user.id) } : e)),
-    )
+      prev.map((e) =>
+        e.id === eventId
+          ? { ...e, participants: e.participants.filter((p) => p !== user.id) }
+          : e
+      )
+    );
 
     toast({
       title: "Has salido del evento",
       description: "Tu registro ha sido cancelado exitosamente.",
-    })
-  }
+    });
+  };
 
   const isUserJoined = (event: Event) => {
-    return user ? event.participants.includes(user.id) : false
-  }
+    return user ? event.participants.includes(user.id) : false;
+  };
 
   const isEventFull = (event: Event) => {
-    return event.maxParticipants ? event.participants.length >= event.maxParticipants : false
-  }
+    return event.maxParticipants
+      ? event.participants.length >= event.maxParticipants
+      : false;
+  };
 
   const canCreateEvent = () => {
-    return hasRole("ROLE_ORGANIZATION")
-  }
+    return hasRole("ROLE_ORGANIZATION");
+  };
 
   const canEditEvent = (event: Event) => {
-    return hasRole("ROLE_ORGANIZATION") && user?.organizationId === event.organizationId
-  }
+    return (
+      hasRole("ROLE_ORGANIZATION") &&
+      user?.organizationId === event.organizationId
+    );
+  };
 
   const canJoinEvent = () => {
-    return hasRole("ROLE_USER") || hasRole("ROLE_ORGANIZATION")
-  }
+    return hasRole("ROLE_USER") || hasRole("ROLE_ORGANIZATION");
+  };
 
   return (
     <ProtectedRoute>
       <Layout>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Eventos Ambientales</h1>
-            <p className="text-gray-600 mt-2">Descubre y participa en eventos de reforestación y conservación</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Eventos Ambientales
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Descubre y participa en eventos de reforestación y conservación
+            </p>
           </div>
 
           {/* Filters */}
@@ -222,7 +275,10 @@ export default function EventsPage() {
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+            <Select
+              value={statusFilter}
+              onValueChange={(value: any) => setStatusFilter(value)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
@@ -248,12 +304,16 @@ export default function EventsPage() {
 
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Filter className="h-4 w-4" />
-              {filteredEvents.length} evento{filteredEvents.length !== 1 ? "s" : ""}
+              {filteredEvents.length} evento
+              {filteredEvents.length !== 1 ? "s" : ""}
             </div>
           </div>
 
           {canCreateEvent() && (
-            <Dialog open={isCreateEventDialogOpen} onOpenChange={setIsCreateEventDialogOpen}>
+            <Dialog
+              open={isCreateEventDialogOpen}
+              onOpenChange={setIsCreateEventDialogOpen}
+            >
               <DialogTrigger asChild>
                 <Button className="flex items-center gap-2">
                   <Plus className="h-4 w-4" />
@@ -263,9 +323,22 @@ export default function EventsPage() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Crear un nuevo evento</DialogTitle>
-                  <DialogDescription>Completa el formulario para crear un evento.</DialogDescription>
+                  <DialogDescription>
+                    Completa el formulario para crear un evento.
+                  </DialogDescription>
                 </DialogHeader>
-                {/* ... event creation form */}
+                {userOrganizationId ? (
+                  <CreateEventForm
+                    organizationId={userOrganizationId} // Pasa el ID de la organización
+                    onSuccess={() => setIsCreateEventDialogOpen(false)} // Cierra el modal
+                  />
+                ) : (
+                  // Muestra un mensaje si no se puede obtener el ID de la organización
+                  <p className="text-red-600">
+                    No se pudo determinar la organización. No puedes crear
+                    eventos.
+                  </p>
+                )}
               </DialogContent>
             </Dialog>
           )}
@@ -276,7 +349,8 @@ export default function EventsPage() {
               <Card>
                 <CardContent className="text-center py-12">
                   <p className="text-gray-500">
-                    No se encontraron eventos que coincidan con los filtros seleccionados.
+                    No se encontraron eventos que coincidan con los filtros
+                    seleccionados.
                   </p>
                 </CardContent>
               </Card>
@@ -284,17 +358,27 @@ export default function EventsPage() {
               filteredEvents.map((event) => (
                 <Card
                   key={event.id}
-                  className={`hover:shadow-md transition-shadow ${event.finished ? "opacity-75" : ""}`}
+                  className={`hover:shadow-md transition-shadow ${
+                    event.finished ? "opacity-75" : ""
+                  }`}
                 >
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <CardTitle className="text-xl">{event.name}</CardTitle>
-                          <Badge className={categoryColors[event.category]}>{categoryLabels[event.category]}</Badge>
-                          {event.finished && <Badge variant="secondary">Finalizado</Badge>}
+                          <CardTitle className="text-xl">
+                            {event.name}
+                          </CardTitle>
+                          <Badge className={categoryColors[event.category]}>
+                            {categoryLabels[event.category]}
+                          </Badge>
+                          {event.finished && (
+                            <Badge variant="secondary">Finalizado</Badge>
+                          )}
                         </div>
-                        <CardDescription className="mb-4">{event.description}</CardDescription>
+                        <CardDescription className="mb-4">
+                          {event.description}
+                        </CardDescription>
                         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
@@ -307,9 +391,16 @@ export default function EventsPage() {
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4" />
                             {event.participants.length}
-                            {event.maxParticipants && ` / ${event.maxParticipants}`} participantes
+                            {event.maxParticipants &&
+                              ` / ${event.maxParticipants}`}{" "}
+                            participantes
                           </div>
-                          <div className="text-green-600 font-medium">{event.organizationName}</div>
+                          <div className="text-green-600 font-medium">
+                            {event.organizationName}
+                          </div>
+                          <div className="text-green-600 font-medium">
+                            {event.organizationName}
+                          </div>
                         </div>
                       </div>
 
@@ -327,7 +418,11 @@ export default function EventsPage() {
                             <Button
                               onClick={() => handleJoinEvent(event.id)}
                               disabled={isEventFull(event)}
-                              className={isEventFull(event) ? "opacity-50 cursor-not-allowed" : ""}
+                              className={
+                                isEventFull(event)
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : ""
+                              }
                             >
                               {isEventFull(event) ? "Evento Lleno" : "Unirse"}
                             </Button>
@@ -345,7 +440,9 @@ export default function EventsPage() {
                       />
                     </div>
                   )}
-                  <CardContent className="pt-0">{/* El resto del contenido permanece igual */}</CardContent>
+                  <CardContent className="pt-0">
+                    {/* El resto del contenido permanece igual */}
+                  </CardContent>
                 </Card>
               ))
             )}
@@ -353,5 +450,5 @@ export default function EventsPage() {
         </div>
       </Layout>
     </ProtectedRoute>
-  )
+  );
 }
