@@ -1,3 +1,5 @@
+import { User } from "@/contexts/AuthContext";
+
 // Tipo para el rol del backend
 export type RoleObject = {
   id: number;
@@ -12,7 +14,7 @@ export type UserType = {
   email: string;
   password?: string;
   phone: string;
-  roles: RoleObject[]; // Ahora es un array de objetos
+  roles: RoleObject[];
   enabled?: boolean;
   username?: string;
   authorities?: Array<{ authority: string }>;
@@ -44,3 +46,17 @@ export type PaginatedUsersResponse = {
   totalElements: number;
 };
 
+// Estructura del UserOrgDTO :p
+export interface UserForCombobox {
+  id: number;
+  name: string;
+  surname: string | null;
+  email: string;
+  phone?: string | null;
+}
+
+export interface GetUsersForComboboxResponse {
+  status: number;
+  message: string;
+  data: UserForCombobox[];
+}
