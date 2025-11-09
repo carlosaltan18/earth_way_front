@@ -6,7 +6,7 @@ import {
   useRemoveRoleFromUser,
   useGetRoles,
 } from "@/features/role/queries";
-import { useGetUsers } from "@/features/user/queries";
+import { useGetUsers, useGetUsersForCombobox } from "@/features/user/queries";
 import {
   useCreateReport,
   useGetReports,
@@ -87,8 +87,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, UserCog, Shield as ShieldIcon } from "lucide-react";
-
+import {
+  MoreVertical,
+  UserCog,
+  Shield as ShieldIcon,
+  Loader2,
+} from "lucide-react";
+import {
+  useCreateOrganization,
+  useUpdateOrganization,
+  useDeleteOrganization,
+  useGetOrganizations,
+} from "@/features/organization/queries";
 // Interfaces
 interface DashboardUser {
   id: string;
@@ -302,6 +312,10 @@ export default function DashboardPage() {
     useState<DashboardOrganization[]>(mockOrganizations);
   const [reports, setReports] = useState<DashboardReport[]>(mockReports);
 
+  const createOrgMutation = useCreateOrganization();
+  const updateOrgMutation = useUpdateOrganization();
+  const deleteOrgMutation = useDeleteOrganization();
+
   const {
     data: usersData,
     isLoading: isLoadingUsers,
@@ -309,6 +323,12 @@ export default function DashboardPage() {
     isError,
     isSuccess,
   } = useGetUsers({ page, size });
+
+  const {
+    data: usersForCombobox,
+    isLoading: isLoadingComboboxUsers,
+    error: comboboxUsersError,
+  } = useGetUsersForCombobox();
 
   const {
     data: reportsData,
@@ -537,11 +557,10 @@ export default function DashboardPage() {
   const [orgForm, setOrgForm] = useState({
     name: "",
     description: "",
-    email: "",
-    phone: "",
-    address: "",
-    category: "" as DashboardOrganization["category"] | "",
-    founded: "",
+    contactEmail: "",
+    contactPhone: "",
+    creatorId: null as number | null,
+    logo: "",
   });
 
   const [reportForm, setReportForm] = useState({
@@ -752,9 +771,9 @@ export default function DashboardPage() {
     if (
       !orgForm.name.trim() ||
       !orgForm.description.trim() ||
-      !orgForm.email.trim() ||
-      !orgForm.category ||
-      !orgForm.founded
+      !orgForm.contactEmail.trim() ||
+      !orgForm.contactPhone.trim() ||
+      !orgForm.creatorId
     ) {
       toast({
         title: "Error",
@@ -764,44 +783,51 @@ export default function DashboardPage() {
       return;
     }
 
-    const newOrg: DashboardOrganization = {
-      id: Date.now().toString(),
-      name: orgForm.name,
-      description: orgForm.description,
-      email: orgForm.email,
-      phone: orgForm.phone,
-      address: orgForm.address,
-      category: orgForm.category as DashboardOrganization["category"],
-      members: 0,
-      eventsCount: 0,
-      founded: orgForm.founded,
-    };
+    createOrgMutation.mutate(
+      {
+        name: orgForm.name,
+        description: orgForm.description,
+        contactEmail: orgForm.contactEmail,
+        contactPhone: orgForm.contactPhone,
+        creatorId: orgForm.creatorId,
+        logo: orgForm.logo || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Organización creada con éxito!",
+            description: "La organización ha sido creada.",
+          });
 
-    setOrganizations((prev) => [...prev, newOrg]);
-    setOrgForm({
-      name: "",
-      description: "",
-      email: "",
-      phone: "",
-      address: "",
-      category: "",
-      founded: "",
-    });
-    setIsOrgDialogOpen(false);
-
-    toast({
-      title: "Organización creada",
-      description: "La organización ha sido creada exitosamente.",
-    });
+          setOrgForm({
+            name: "",
+            description: "",
+            contactEmail: "",
+            contactPhone: "",
+            creatorId: null as number | null,
+            logo: "",
+          });
+          setIsOrgDialogOpen(false);
+        },
+        onError: (error: Error) => {
+          toast({
+            title: "Error al crear",
+            description: error.message || "No se pudo conectar al servidor.",
+            variant: "destructive",
+          });
+        },
+      }
+    );
   };
 
   const handleEditOrganization = () => {
     if (
+      !editingOrg ||
       !orgForm.name.trim() ||
       !orgForm.description.trim() ||
-      !orgForm.email.trim() ||
-      !orgForm.category ||
-      !orgForm.founded
+      !orgForm.contactEmail.trim() ||
+      !orgForm.contactPhone.trim() ||
+      !orgForm.creatorId
     ) {
       toast({
         title: "Error",
@@ -811,33 +837,44 @@ export default function DashboardPage() {
       return;
     }
 
-    setOrganizations((prev) =>
-      prev.map((org) =>
-        org.id === editingOrg!.id
-          ? {
-              ...org,
-              name: orgForm.name,
-              description: orgForm.description,
-              email: orgForm.email,
-              phone: orgForm.phone,
-              address: orgForm.address,
-              category: orgForm.category as DashboardOrganization["category"],
-              founded: orgForm.founded,
-            }
-          : org
-      )
+    updateOrgMutation.mutate(
+      {
+        id: Number(editingOrg.id),
+        org: {
+          name: orgForm.name,
+          description: orgForm.description,
+          contactEmail: orgForm.contactEmail,
+          contactPhone: orgForm.contactPhone,
+          creatorId: orgForm.creatorId,
+          logo: orgForm.logo || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Organización actualizada",
+            description: "Los cambios han sido guardados exitosamente.",
+          });
+          setEditingOrg(null);
+          setOrgForm({
+            name: "",
+            description: "",
+            contactEmail: "",
+            contactPhone: "",
+            creatorId: null as number | null,
+            logo: "",
+          });
+          setIsOrgDialogOpen(false);
+        },
+        onError: (error: Error) => {
+          toast({
+            title: "Error al actualizar",
+            description: error.message || "No se pudo conectar al servidor.",
+            variant: "destructive",
+          });
+        },
+      }
     );
-
-    setEditingOrg(null);
-    setOrgForm({
-      name: "",
-      description: "",
-      email: "",
-      phone: "",
-      address: "",
-      category: "",
-      founded: "",
-    });
 
     toast({
       title: "Organización actualizada",
@@ -846,10 +883,20 @@ export default function DashboardPage() {
   };
 
   const handleDeleteOrganization = (orgId: string) => {
-    setOrganizations((prev) => prev.filter((o) => o.id !== orgId));
-    toast({
-      title: "Organización eliminada",
-      description: "La organización ha sido eliminada del sistema.",
+    deleteOrgMutation.mutate(Number(orgId), {
+      onSuccess: () => {
+        toast({
+          title: "Organización eliminada",
+          description: "La organización ha sido eliminada del sistema.",
+        });
+      },
+      onError: (error: Error) => {
+        toast({
+          title: "Error al eliminar",
+          description: error.message || "No se pudo conectar al servidor.",
+          variant: "destructive",
+        });
+      },
     });
   };
 
@@ -858,11 +905,10 @@ export default function DashboardPage() {
     setOrgForm({
       name: org.name,
       description: org.description,
-      email: org.email,
-      phone: org.phone || "",
-      address: org.address || "",
-      category: org.category,
-      founded: org.founded,
+      contactEmail: org.email,
+      contactPhone: org.phone || "",
+      creatorId: null,
+      logo: "",
     });
   };
 
@@ -1667,107 +1713,95 @@ export default function DashboardPage() {
                                 placeholder="Nombre de la organización"
                               />
                             </div>
-                            <div>
-                              <Label>Descripción</Label>
-                              <Textarea
-                                value={orgForm.description}
-                                onChange={(e) =>
-                                  setOrgForm((prev) => ({
-                                    ...prev,
-                                    description: e.target.value,
-                                  }))
-                                }
-                                placeholder="Describe la organización :)"
-                                rows={3}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label>Email</Label>
-                                <Input
-                                  type="email"
-                                  value={orgForm.email}
-                                  onChange={(e) =>
-                                    setOrgForm((prev) => ({
-                                      ...prev,
-                                      email: e.target.value,
-                                    }))
+                          </div>
+
+                          <div>
+                            <Label>Descripción</Label>
+                            <Textarea
+                              value={orgForm.description}
+                              onChange={(e) =>
+                                setOrgForm((prev) => ({
+                                  ...prev,
+                                  description: e.target.value,
+                                }))
+                              }
+                              placeholder="Describe la organización :)"
+                              rows={3}
+                            />
+                          </div>
+
+                          <div>
+                            <Label>Asignar Creador (Dueño)</Label>
+                            <Select
+                              value={orgForm.creatorId?.toString() ?? ""}
+                              onValueChange={(value) =>
+                                setOrgForm((prev) => ({
+                                  ...prev,
+                                  creatorId: Number(value),
+                                }))
+                              }
+                              disabled={isLoadingComboboxUsers}
+                            >
+                              <SelectTrigger>
+                                <SelectValue
+                                  placeholder={
+                                    isLoadingComboboxUsers
+                                      ? "Cargando usuarios..."
+                                      : "Selecciona un usuario"
                                   }
-                                  placeholder=" contacto@org.com"
                                 />
-                              </div>
-                              <div>
-                                <Label>Teléfono</Label>
-                                <Input
-                                  value={orgForm.phone}
-                                  onChange={(e) =>
-                                    setOrgForm((prev) => ({
-                                      ...prev,
-                                      phone: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="+502 1234 5678"
-                                />
-                              </div>
-                            </div>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {!isLoadingComboboxUsers &&
+                                usersForCombobox &&
+                                usersForCombobox.length > 0 ? (
+                                  usersForCombobox.map((user) => (
+                                    <SelectItem
+                                      key={user.id}
+                                      value={user.id.toString()}
+                                    >
+                                      {user.name} {user.surname} ({user.email})
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem value="loading" disabled>
+                                    Cargando...
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <Label>Dirección</Label>
+                              <Label>Email</Label>
                               <Input
-                                value={orgForm.address}
+                                type="email"
+                                value={orgForm.contactEmail}
                                 onChange={(e) =>
                                   setOrgForm((prev) => ({
                                     ...prev,
-                                    address: e.target.value,
+                                    contactEmail: e.target.value,
                                   }))
                                 }
-                                placeholder="Dirección de la organización"
+                                placeholder=" contacto@org.com"
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label>Categoría</Label>
-                                <Select
-                                  value={orgForm.category}
-                                  onValueChange={(value) =>
-                                    setOrgForm((prev) => ({
-                                      ...prev,
-                                      category:
-                                        value as DashboardOrganization["category"],
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Selecciona categoría" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="ngo">ONG</SelectItem>
-                                    <SelectItem value="government">
-                                      Gubernamental
-                                    </SelectItem>
-                                    <SelectItem value="private">
-                                      Privada
-                                    </SelectItem>
-                                    <SelectItem value="community">
-                                      Comunitaria
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label>Fecha de fundación</Label>
-                                <Input
-                                  type="date"
-                                  value={orgForm.founded}
-                                  onChange={(e) =>
-                                    setOrgForm((prev) => ({
-                                      ...prev,
-                                      founded: e.target.value,
-                                    }))
-                                  }
-                                />
-                              </div>
+                            <div>
+                              <Label>Teléfono</Label>
+                              <Input
+                                value={orgForm.contactPhone}
+                                onChange={(e) =>
+                                  setOrgForm((prev) => ({
+                                    ...prev,
+                                    contactPhone: e.target.value,
+                                  }))
+                                }
+                                placeholder="+502 1234 5678"
+                              />
                             </div>
                           </div>
+
                           <DialogFooter>
                             <Button
                               variant="outline"
@@ -1777,11 +1811,10 @@ export default function DashboardPage() {
                                 setOrgForm({
                                   name: "",
                                   description: "",
-                                  email: "",
-                                  phone: "",
-                                  address: "",
-                                  category: "",
-                                  founded: "",
+                                  contactEmail: "",
+                                  contactPhone: "",
+                                  creatorId: null,
+                                  logo: "",
                                 });
                               }}
                             >
@@ -1979,7 +2012,10 @@ export default function DashboardPage() {
                               onLocationSelect={(
                                 location: { lat: number; lng: number } | null
                               ) =>
-                                setReportForm((prev) => ({ ...prev, location }))
+                                setReportForm((prev) => ({
+                                  ...prev,
+                                  location,
+                                }))
                               }
                               height="350px"
                             />
