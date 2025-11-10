@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -33,7 +34,6 @@ import {
 import type { Organization } from "@/features/organization/types";
 
 interface OrganizationCardData extends Organization {
-  // Aquí puedes añadir los campos que tu frontend espera y que no están en el DTO de Spring
   category?: "ngo" | "government" | "private" | "community";
   eventsCount?: number;
   members?: number;
@@ -66,6 +66,7 @@ export default function OrganizationsPage() {
     isLoading: isSearchLoading,
     isFetching: isSearchFetching,
     isError: isSearchError,
+    error: searchError,
   } = useSearchOrganization(debouncedSearchTerm);
 
   const {
@@ -73,21 +74,33 @@ export default function OrganizationsPage() {
     isLoading: isListLoading,
     isFetching: isListFetching,
     isError: isListError,
-  } = useGetOrganizations({ page: 0, size: 20 });
+    error: listError,
+  } = useGetOrganizations(
+    { page: page, size: 9 },
+    debouncedSearchTerm.trim() === ""
+  );
 
   let organizationsToDisplay: OrganizationCardData[] = [];
   let isLoading = false;
   let isError = false;
+  let totalPages = 1;
+  let error: Error | null = null;
 
-  if (searchTerm.trim() !== "") {
+  if (debouncedSearchTerm.trim() !== "") {
     organizationsToDisplay = searchData || [];
     isLoading = isSearchLoading || isSearchFetching;
     isError = isSearchError;
+    error = searchError || null;
+    totalPages = 1;
   } else {
-    organizationsToDisplay = listData || [];
+    organizationsToDisplay = listData?.payload || [];
     isLoading = isListLoading || isListFetching;
     isError = isListError;
+    error = listError || null;
+    totalPages = listData?.totalPages || 1;
   }
+
+  const errorMessage = error?.message || "Error desconocido";
 
   const organizationsWithMockData = organizationsToDisplay.map((org) => ({
     ...org,
@@ -247,7 +260,15 @@ export default function OrganizationsPage() {
                       </div>
 
                       <div className="flex justify-end mt-4">
-                        <Button variant="outline">Ver Perfil</Button>
+                        <Link href={`/organizations/${org.id}`} passHref>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                          >
+                            Ver Perfil
+                          </Button>
+                        </Link>
                       </div>
                     </CardContent>
                   </Card>

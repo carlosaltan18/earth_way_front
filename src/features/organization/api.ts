@@ -1,23 +1,25 @@
 import { api, ApiError } from "@/lib/api";
-import type { Organization, GetOrganizationsParams } from "./types";
+import type {
+  Organization,
+  GetOrganizationsParams,
+  GetOrganizationsResponse,
+} from "./types";
 import { isAxiosError } from "axios";
-
-interface GetOrganizationsResponse {
-  payload: Organization[];
-}
 
 interface GetOrganizationResponse {
   payload: Organization;
 }
 
 export const organizationApi = {
-  list: async (params?: GetOrganizationsParams): Promise<Organization[]> => {
+  list: async (
+    params?: GetOrganizationsParams
+  ): Promise<GetOrganizationsResponse> => {
     try {
       const response = await api.get<GetOrganizationsResponse>(
         "/organization",
         { params }
       );
-      return response.data.payload;
+      return response.data;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }

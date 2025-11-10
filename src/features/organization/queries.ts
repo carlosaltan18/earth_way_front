@@ -1,20 +1,35 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { organizationApi } from "./api";
-import type { Organization, GetOrganizationsParams } from "./types";
+import type {
+  Organization,
+  GetOrganizationsParams,
+  GetOrganizationsResponse,
+} from "./types";
 
 export const organizationKeys = {
   all: ["organizations"] as const,
   lists: () => [...organizationKeys.all, "list"] as const,
-  list: (params?: GetOrganizationsParams) => [...organizationKeys.lists(), params] as const,
+  list: (params?: GetOrganizationsParams) =>
+    [...organizationKeys.lists(), params] as const,
   details: () => [...organizationKeys.all, "detail"] as const,
   detail: (id: number) => [...organizationKeys.details(), id] as const,
   search: (name: string) => [...organizationKeys.all, "search", name] as const,
 };
 
-export const useGetOrganizations = (params?: GetOrganizationsParams) => {
-  return useQuery({
+export const useGetOrganizations = (
+  params?: GetOrganizationsParams,
+  enabled: boolean = true
+) => {
+  return useQuery<GetOrganizationsResponse, Error>({
     queryKey: organizationKeys.list(params),
     queryFn: () => organizationApi.list(params),
+    placeholderData: keepPreviousData,
+    enabled: enabled,
   });
 };
 

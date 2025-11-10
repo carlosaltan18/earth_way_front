@@ -1,13 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "react-query";
-import { organizationApi } from "./api"; // Importa tu objeto de API
-import type { Organization, GetOrganizationsParams } from "./types"; // Importa tus tipos
+import { organizationApi } from "./api";
+import type {
+  Organization,
+  GetOrganizationsParams,
+  GetOrganizationsResponse,
+} from "./types";
 
 export const ORGANIZATION_QUERY_KEY = "organizations";
 
-// --- 1. Hook para Listar Organizaciones Paginadas (useQuery) ---
-
-export const useOrganizations = (params: GetOrganizationsParams) => {
-  return useQuery<Organization[], Error>(
+export const useOrganizations = (
+  params: GetOrganizationsParams,
+  enabled: boolean = true
+) => {
+  return useQuery<GetOrganizationsResponse, Error>(
     [ORGANIZATION_QUERY_KEY, params],
     () => organizationApi.list(params),
     {
