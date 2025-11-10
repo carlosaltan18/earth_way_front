@@ -1,6 +1,7 @@
 "use client";
 
 import type { UserType, PaginatedUsersResponse } from "@/features/user/types";
+import Image from "next/image"; // ✅ Agregar esta línea
 import {
   useAddRoleToUser,
   useRemoveRoleFromUser,
@@ -99,6 +100,8 @@ import {
   useDeleteOrganization,
   useGetOrganizations,
 } from "@/features/organization/queries";
+import ImageUploader from "@/components/upload/ImageUploader";
+
 // Interfaces
 interface DashboardUser {
   id: string;
@@ -139,6 +142,7 @@ interface DashboardOrganization {
   email: string;
   phone?: string;
   address?: string;
+  logo?: string; 
   category: "ngo" | "government" | "private" | "community";
   members: number;
   eventsCount: number;
@@ -387,8 +391,8 @@ export default function DashboardPage() {
         (report: any) => {
           const address = report.location
             ? `Lat: ${report.location.latitude.toFixed(
-                4
-              )}, Lng: ${report.location.longitude.toFixed(4)}`
+              4
+            )}, Lng: ${report.location.longitude.toFixed(4)}`
             : "Sin ubicación";
 
           return {
@@ -569,6 +573,12 @@ export default function DashboardPage() {
     location: null as { lat: number; lng: number } | null,
   });
 
+  const handleImageSelected = (imageUrl: string) => {
+    setOrgForm((prev) => ({
+      ...prev,
+      logo: imageUrl,
+    }));
+  };
   // Filter functions
   const filteredUsers = users.filter(
     (u) =>
@@ -707,16 +717,16 @@ export default function DashboardPage() {
       prev.map((event) =>
         event.id === editingEvent!.id
           ? {
-              ...event,
-              name: eventForm.name,
-              description: eventForm.description,
-              date: eventForm.date,
-              location: eventForm.location,
-              maxParticipants: eventForm.maxParticipants
-                ? Number.parseInt(eventForm.maxParticipants)
-                : undefined,
-              category: eventForm.category as DashboardEvent["category"],
-            }
+            ...event,
+            name: eventForm.name,
+            description: eventForm.description,
+            date: eventForm.date,
+            location: eventForm.location,
+            maxParticipants: eventForm.maxParticipants
+              ? Number.parseInt(eventForm.maxParticipants)
+              : undefined,
+            category: eventForm.category as DashboardEvent["category"],
+          }
           : event
       )
     );
@@ -948,9 +958,8 @@ export default function DashboardPage() {
         onError: (error: any) => {
           toast({
             title: "Error",
-            description: `No se pudo crear el reporte: ${
-              error.message || "Error desconocido"
-            }`,
+            description: `No se pudo crear el reporte: ${error.message || "Error desconocido"
+              }`,
             variant: "destructive",
           });
         },
@@ -979,9 +988,8 @@ export default function DashboardPage() {
         onError: (error: any) => {
           toast({
             title: "Error",
-            description: `No se pudo actualizar el estado del reporte: ${
-              error.message || "Error desconocido"
-            }`,
+            description: `No se pudo actualizar el estado del reporte: ${error.message || "Error desconocido"
+              }`,
             variant: "destructive",
           });
         },
@@ -1001,9 +1009,8 @@ export default function DashboardPage() {
       onError: (error: any) => {
         toast({
           title: "Error",
-          description: `No se pudo eliminar el reporte: ${
-            error.message || "Error desconocido"
-          }`,
+          description: `No se pudo eliminar el reporte: ${error.message || "Error desconocido"
+            }`,
           variant: "destructive",
         });
       },
@@ -1063,9 +1070,8 @@ export default function DashboardPage() {
         onError: (error: any) => {
           toast({
             title: "Error",
-            description: `No se pudo actualizar el reporte: ${
-              error.message || "Error desconocido"
-            }`,
+            description: `No se pudo actualizar el reporte: ${error.message || "Error desconocido"
+              }`,
             variant: "destructive",
           });
         },
@@ -1676,22 +1682,17 @@ export default function DashboardPage() {
                           Administra organizaciones registradas
                         </CardDescription>
                       </div>
-                      <Dialog
-                        open={isOrgDialogOpen}
-                        onOpenChange={setIsOrgDialogOpen}
-                      >
+                      <Dialog open={isOrgDialogOpen} onOpenChange={setIsOrgDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button>
-                            <Plus className="h-4 w-4 mr-0" />
+                          <Button className="w-full sm:w-auto">
+                            <Plus className="h-4 w-4 mr-2" />
                             Crear Organización
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>
-                              {editingOrg
-                                ? "Editar Organización"
-                                : "Crear Nueva Organización"}
+                              {editingOrg ? "Editar Organización" : "Crear Nueva Organización"}
                             </DialogTitle>
                             <DialogDescription>
                               {editingOrg
@@ -1700,8 +1701,17 @@ export default function DashboardPage() {
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
+                            {/* Logo Upload */}
+                            <ImageUploader
+                              onImageSelected={handleImageSelected}
+                              currentImage={orgForm.logo}
+                              label="Logo de la Organización (Opcional)"
+                              placeholder="Sube el logo de la organización"
+                            />
+
+                            {/* Nombre */}
                             <div>
-                              <Label>Nombre</Label>
+                              <Label>Nombre *</Label>
                               <Input
                                 value={orgForm.name}
                                 onChange={(e) =>
@@ -1713,92 +1723,92 @@ export default function DashboardPage() {
                                 placeholder="Nombre de la organización"
                               />
                             </div>
-                          </div>
 
-                          <div>
-                            <Label>Descripción</Label>
-                            <Textarea
-                              value={orgForm.description}
-                              onChange={(e) =>
-                                setOrgForm((prev) => ({
-                                  ...prev,
-                                  description: e.target.value,
-                                }))
-                              }
-                              placeholder="Describe la organización :)"
-                              rows={3}
-                            />
-                          </div>
-
-                          <div>
-                            <Label>Asignar Creador (Dueño)</Label>
-                            <Select
-                              value={orgForm.creatorId?.toString() ?? ""}
-                              onValueChange={(value) =>
-                                setOrgForm((prev) => ({
-                                  ...prev,
-                                  creatorId: Number(value),
-                                }))
-                              }
-                              disabled={isLoadingComboboxUsers}
-                            >
-                              <SelectTrigger>
-                                <SelectValue
-                                  placeholder={
-                                    isLoadingComboboxUsers
-                                      ? "Cargando usuarios..."
-                                      : "Selecciona un usuario"
-                                  }
-                                />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {!isLoadingComboboxUsers &&
-                                usersForCombobox &&
-                                usersForCombobox.length > 0 ? (
-                                  usersForCombobox.map((user) => (
-                                    <SelectItem
-                                      key={user.id}
-                                      value={user.id.toString()}
-                                    >
-                                      {user.name} {user.surname} ({user.email})
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="loading" disabled>
-                                    Cargando...
-                                  </SelectItem>
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
+                            {/* Descripción */}
                             <div>
-                              <Label>Email</Label>
-                              <Input
-                                type="email"
-                                value={orgForm.contactEmail}
+                              <Label>Descripción *</Label>
+                              <Textarea
+                                value={orgForm.description}
                                 onChange={(e) =>
                                   setOrgForm((prev) => ({
                                     ...prev,
-                                    contactEmail: e.target.value,
+                                    description: e.target.value,
                                   }))
                                 }
-                                placeholder=" contacto@org.com"
+                                placeholder="Describe la organización"
+                                rows={3}
                               />
                             </div>
+
+                            {/* Creador/Dueño */}
                             <div>
-                              <Label>Teléfono</Label>
-                              <Input
-                                value={orgForm.contactPhone}
-                                onChange={(e) =>
+                              <Label>Asignar Creador (Dueño) *</Label>
+                              <Select
+                                value={orgForm.creatorId?.toString() ?? ""}
+                                onValueChange={(value) =>
                                   setOrgForm((prev) => ({
                                     ...prev,
-                                    contactPhone: e.target.value,
+                                    creatorId: Number(value),
                                   }))
                                 }
-                                placeholder="+502 1234 5678"
-                              />
+                                disabled={isLoadingComboboxUsers}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue
+                                    placeholder={
+                                      isLoadingComboboxUsers
+                                        ? "Cargando usuarios..."
+                                        : "Selecciona un usuario"
+                                    }
+                                  />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {!isLoadingComboboxUsers &&
+                                    usersForCombobox &&
+                                    usersForCombobox.length > 0 ? (
+                                    usersForCombobox.map((user) => (
+                                      <SelectItem key={user.id} value={user.id.toString()}>
+                                        {user.name} {user.surname} ({user.email})
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <SelectItem value="loading" disabled>
+                                      Cargando...
+                                    </SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Email y Teléfono */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <Label>Email *</Label>
+                                <Input
+                                  type="email"
+                                  value={orgForm.contactEmail}
+                                  onChange={(e) =>
+                                    setOrgForm((prev) => ({
+                                      ...prev,
+                                      contactEmail: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="contacto@org.com"
+                                />
+                              </div>
+                              <div>
+                                <Label>Teléfono *</Label>
+                                <Input
+                                  value={orgForm.contactPhone}
+                                  onChange={(e) =>
+                                    setOrgForm((prev) => ({
+                                      ...prev,
+                                      contactPhone: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="+502 1234 5678"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -1817,19 +1827,27 @@ export default function DashboardPage() {
                                   logo: "",
                                 });
                               }}
+                              disabled={
+                                createOrgMutation.isPending || updateOrgMutation.isPending
+                              }
                             >
                               Cancelar
                             </Button>
                             <Button
                               onClick={
-                                editingOrg
-                                  ? handleEditOrganization
-                                  : handleCreateOrganization
+                                editingOrg ? handleEditOrganization : handleCreateOrganization
+                              }
+                              disabled={
+                                createOrgMutation.isPending || updateOrgMutation.isPending
                               }
                             >
                               {editingOrg
-                                ? "Guardar Cambios"
-                                : "Crear Organización"}
+                                ? updateOrgMutation.isPending
+                                  ? "Actualizando..."
+                                  : "Guardar Cambios"
+                                : createOrgMutation.isPending
+                                  ? "Creando..."
+                                  : "Crear Organización"}
                             </Button>
                           </DialogFooter>
                         </DialogContent>
@@ -1848,93 +1866,137 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="space-y-3">
-                      {filteredOrgs.map((org) => (
-                        <Card key={org.id}>
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h4 className="font-semibold">{org.name}</h4>
-                                  <Badge>{categoryLabels[org.category]}</Badge>
-                                </div>
-                                <p className="text-sm text-gray-600 mb-2">
-                                  {org.description}
-                                </p>
-                                <div className="space-y-1 text-sm text-gray-600">
-                                  <div className="flex items-center gap-2">
-                                    <Mail className="h-4 w-4" />
-                                    {org.email}
-                                  </div>
-                                  {org.phone && (
-                                    <div className="flex items-center gap-2">
-                                      <Phone className="h-4 w-4" />
-                                      {org.phone}
+                      {filteredOrgs.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <p>No hay organizaciones disponibles</p>
+                        </div>
+                      ) : (
+                        filteredOrgs.map((org) => (
+                          <Card key={org.id}>
+                            <CardContent className="p-4">
+                              <div className="flex flex-col sm:flex-row gap-4">
+                                {/* Logo */}
+                                {org.logo && (
+                                  <div className="flex-shrink-0">
+                                    <div className="relative w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                                      <Image
+                                        src={org.logo}
+                                        alt={org.name}
+                                        fill
+                                        className="object-contain p-2"
+                                      />
                                     </div>
-                                  )}
-                                  {org.address && (
-                                    <div className="flex items-center gap-2">
-                                      <MapPin className="h-4 w-4" />
-                                      {org.address}
+                                  </div>
+                                )}
+
+                                {/* Contenido */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start gap-2 mb-2">
+                                    <h4 className="font-semibold text-sm sm:text-base">
+                                      {org.name}
+                                    </h4>
+                                    <Badge className="text-xs sm:text-sm flex-shrink-0">
+                                      {categoryLabels[org.category]}
+                                    </Badge>
+                                  </div>
+
+                                  <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2">
+                                    {org.description}
+                                  </p>
+
+                                  <div className="space-y-1 text-xs sm:text-sm text-gray-600">
+                                    <div className="flex items-center gap-2 break-all">
+                                      <Mail className="h-4 w-4 flex-shrink-0" />
+                                      {org.email}
                                     </div>
-                                  )}
-                                  <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    {org.members} miembros · {org.eventsCount}{" "}
-                                    eventos
+                                    {org.phone && (
+                                      <div className="flex items-center gap-2">
+                                        <Phone className="h-4 w-4 flex-shrink-0" />
+                                        {org.phone}
+                                      </div>
+                                    )}
+                                    {org.address && (
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 flex-shrink-0" />
+                                        <span className="line-clamp-1">{org.address}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <Users className="h-4 w-4 flex-shrink-0" />
+                                      {org.members} miembros · {org.eventsCount} eventos
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    openEditOrgDialog(org);
-                                    setIsOrgDialogOpen(true);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-red-600 hover:text-red-700"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>
-                                        ¿Eliminar organización?
-                                      </AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Esta acción eliminará la organización y
-                                        todos sus eventos asociados.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>
-                                        Cancelar
-                                      </AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() =>
-                                          handleDeleteOrganization(org.id)
-                                        }
-                                        className="bg-red-600 hover:bg-red-700"
+
+                                {/* Acciones */}
+                                <div className="flex gap-2 flex-shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingOrg(org);
+                                      setOrgForm({
+                                        name: org.name,
+                                        description: org.description,
+                                        contactEmail: org.email,
+                                        contactPhone: org.phone || "",
+                                        creatorId: null,
+                                        logo: org.logo || "",
+                                      });
+                                      setIsOrgDialogOpen(true);
+                                    }}
+                                    disabled={
+                                      updateOrgMutation.isPending ||
+                                      deleteOrgMutation.isPending
+                                    }
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-600 hover:text-red-700"
+                                        disabled={deleteOrgMutation.isPending}
                                       >
-                                        Eliminar
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                          ¿Eliminar organización?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta acción eliminará la organización y
+                                          todos sus eventos asociados.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>
+                                          Cancelar
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() =>
+                                            handleDeleteOrganization(org.id)
+                                          }
+                                          disabled={deleteOrgMutation.isPending}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          {deleteOrgMutation.isPending
+                                            ? "Eliminando..."
+                                            : "Eliminar"}
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </div>
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -2051,8 +2113,8 @@ export default function DashboardPage() {
                                 ? "Actualizando..."
                                 : "Guardar Cambios"
                               : isCreatingReport
-                              ? "Creando..."
-                              : "Crear Reporte"}
+                                ? "Creando..."
+                                : "Crear Reporte"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -2108,15 +2170,15 @@ export default function DashboardPage() {
                                         report.severity === "high"
                                           ? "destructive"
                                           : report.severity === "medium"
-                                          ? "default"
-                                          : "secondary"
+                                            ? "default"
+                                            : "secondary"
                                       }
                                     >
                                       {report.severity === "high"
                                         ? "Alta"
                                         : report.severity === "medium"
-                                        ? "Media"
-                                        : "Baja"}
+                                          ? "Media"
+                                          : "Baja"}
                                     </Badge>
                                     {report.done ? (
                                       <Badge className="bg-green-100 text-green-800">
@@ -2345,10 +2407,10 @@ export default function DashboardPage() {
                     {availableRoles?.every((role) =>
                       selectedUser?.roles.includes(role.name as UserRole)
                     ) && (
-                      <p className="text-sm text-gray-500 text-center py-4">
-                        El usuario ya tiene todos los roles disponibles
-                      </p>
-                    )}
+                        <p className="text-sm text-gray-500 text-center py-4">
+                          El usuario ya tiene todos los roles disponibles
+                        </p>
+                      )}
                   </div>
                 )}
               </div>
