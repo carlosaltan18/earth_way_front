@@ -103,9 +103,9 @@ export default function OrganizationDetailPageApp() {
 
         <Card className="overflow-hidden shadow-xl border border-border/40 rounded-lg">
           {/* Banner */}
-          <div className="relative bg-gradient-to-br from-primary/10 via-background to-background p-8 border-b border-border/40">
+          <div className="relative bg-gradient-to-bl from-green-500/30 via-background to-background p-8 border-b border-border/40">
             <div className="flex flex-col md:flex-row items-center gap-6">
-              <Avatar className="h-28 w-28 border-4 border-background shadow-md">
+              <Avatar className="h-28 w-28 border-4 border-green-500 shadow-md">
                 <AvatarImage
                   src={organization.logo || "/placeholder.svg"}
                   alt={organization.name}
@@ -138,7 +138,7 @@ export default function OrganizationDetailPageApp() {
             <div className="lg:col-span-2 p-8 space-y-8">
               {/* Descripción */}
               <div>
-                <h3 className="text-2xl font-semibold text-foreground mb-4 border-l-4 border-primary pl-3">
+                <h3 className="text-2xl font-semibold text-foreground mb-4 border-l-4 border-green-500 pl-3">
                   {" "}
                   {/* Texto principal */}
                   Descripción
@@ -155,7 +155,7 @@ export default function OrganizationDetailPageApp() {
               <Separator />
               {/* Contacto */}
               <div>
-                <h3 className="text-2xl font-semibold text-foreground mb-4 border-l-4 border-primary pl-3">
+                <h3 className="text-2xl font-semibold text-foreground mb-4 border-l-4 border-green-500 pl-3">
                   {" "}
                   {/* Texto principal */}
                   Contacto
