@@ -5,7 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Calendar, MapPin, Users, Building, Edit, Trash2, Plus } from "lucide-react";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import dynamic from "next/dynamic";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+
+const MapLocationPicker = dynamic(() => import("@/components/map/MapLocationPicker"), { ssr: false }) as any;
 
 export default function EventSection({
   events,
@@ -17,6 +24,16 @@ export default function EventSection({
   handleDeleteEvent,
   hasRole,
   categoryLabels,
+  isEventDialogOpen,
+  eventForm,
+  setEventForm,
+  handleCreateEvent,
+  handleEditEvent,
+  isCreatingEvent,
+  isUpdatingEvent,
+  isDeletingEvent,
+  editingEvent,
+  organizations,
 }: {
   events: any[];
   eventSearch: string;
@@ -27,6 +44,16 @@ export default function EventSection({
   handleDeleteEvent: (id: string) => void;
   hasRole: (role: string) => boolean;
   categoryLabels: Record<string, string>;
+  isEventDialogOpen: boolean;
+  eventForm: any;
+  setEventForm: (f: any) => void;
+  handleCreateEvent: () => void;
+  handleEditEvent: () => void;
+  isCreatingEvent: boolean;
+  isUpdatingEvent: boolean;
+  isDeletingEvent: boolean;
+  editingEvent: any | null;
+  organizations: any[];
 }) {
   return (
     <Card>
@@ -39,9 +66,63 @@ export default function EventSection({
 
           {hasRole("ROLE_ORGANIZATION") && (
             <div>
-              <Button onClick={() => setIsEventDialogOpen(true)} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" /> Crear Evento
-              </Button>
+              <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" /> Crear Evento</Button>
+                </DialogTrigger>
+
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingEvent ? "Editar Evento" : "Crear Nuevo Evento"}</DialogTitle>
+                    <DialogDescription>{editingEvent ? "Actualiza el evento" : "Crea un evento ambiental. Selecciona ubicación en mapa si aplica."}</DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Organización *</Label>
+                      <Select value={eventForm.idOrganization} onValueChange={(value) => setEventForm((prev: any) => ({ ...prev, idOrganization: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una organización" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {organizations.map((org) => (
+                            <SelectItem key={org.id} value={org.id}>
+                              {org.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label>Nombre del evento</Label>
+                      <Input value={eventForm.name} onChange={(e) => setEventForm((prev: any) => ({ ...prev, name: e.target.value }))} placeholder="Ej: Reforestación Parque Central" />
+                    </div>
+
+                    <div>
+                      <Label>Descripción</Label>
+                      <Textarea value={eventForm.description} onChange={(e) => setEventForm((prev: any) => ({ ...prev, description: e.target.value }))} placeholder="Describe la actividad..." rows={4} />
+                    </div>
+
+                    <div>
+                      <Label>Fecha</Label>
+                      <Input type="date" value={eventForm.date} onChange={(e) => setEventForm((prev: any) => ({ ...prev, date: e.target.value }))} />
+                    </div>
+
+                    <div>
+                      <Label className="mb-2 block">Ubicación (opcional)</Label>
+                      <MapLocationPicker selectedLocation={typeof eventForm.location === 'object' && eventForm.location ? eventForm.location : null} onLocationSelect={(location: { lat: number; lng: number } | null) => setEventForm((prev: any) => ({ ...prev, location }))} height="300px" />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => { setIsEventDialogOpen(false); setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "" }); }} disabled={isCreatingEvent || isUpdatingEvent}>Cancelar</Button>
+                    <Button onClick={editingEvent ? handleEditEvent : handleCreateEvent} disabled={isCreatingEvent || isUpdatingEvent} className="bg-blue-600 hover:bg-blue-700">
+                      {editingEvent ? (isUpdatingEvent ? "Actualizando..." : "Guardar Cambios") : (isCreatingEvent ? "Creando..." : "Crear Evento")}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
         </div>
@@ -73,7 +154,11 @@ export default function EventSection({
                       <div className="flex items-center gap-2"><Calendar className="h-4 w-4 flex-shrink-0" />{new Date(event.date).toLocaleDateString("es-ES")}</div>
                       <div className="flex items-center gap-2"><MapPin className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{event.location}</span></div>
                       <div className="flex items-center gap-2"><Users className="h-4 w-4 flex-shrink-0" />{event.participants} participantes{event.maxParticipants && ` / ${event.maxParticipants}`}</div>
-                      <div className="flex items-center gap-2"><Building className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{event.organizationName}</span></div>
+                      <div className="flex items-center gap-2"><Building className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{(() => {
+                        const org = organizations.find((o) => o.id === event.organizationId);
+                        console.log("Buscando org con id:", event.organizationId, "Orgs disponibles:", organizations.map(o => o.id), "Org encontrada:", org?.name);
+                        return org?.name || "Organización no encontrada";
+                      })()}</span></div>
                     </div>
                   </div>
 

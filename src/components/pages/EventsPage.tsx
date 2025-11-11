@@ -32,86 +32,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { CreateEventForm } from "@/components/events/CreateEventForm";
+import type { Event as ApiEvent } from "@/features/event/types";
+import {
+  useGetEvents,
+  useDeleteEvent,
+  useUpdateEvent,
+} from "@/features/event/queries";
 
-interface Event {
-  id: string;
-  name: string;
-  description: string;
-  date: string;
-  location: {
-    lat: number;
-    lng: number;
-    address: string;
-  };
-  organizationId: string;
-  organizationName: string;
-  participants: string[];
-  maxParticipants?: number;
-  finished: boolean;
-  category: "reforestation" | "cleanup" | "education" | "conservation";
-  images?: string[];
-}
+import { Textarea } from "@/components/ui/textarea"
 
-// Mock events data
-const mockEvents: Event[] = [
-  {
-    id: "1",
-    name: "Reforestación Cerro Verde",
-    description:
-      "Jornada de plantación de árboles nativos en el Cerro Verde. Incluye desayuno, herramientas y transporte desde el centro de la ciudad.",
-    date: "2024-02-15",
-    location: {
-      lat: -12.0464,
-      lng: -77.0428,
-      address: "Cerro Verde, Lima, Perú",
-    },
-    organizationId: "1",
-    organizationName: "EcoLima",
-    participants: ["1", "2"],
-    maxParticipants: 50,
-    finished: false,
-    category: "reforestation",
-    images: ["/placeholder.svg?height=300&width=500"],
-  },
-  {
-    id: "2",
-    name: "Limpieza Playa Costa Verde",
-    description:
-      "Actividad de limpieza y concientización ambiental en la Costa Verde. Actividad familiar con materiales incluidos.",
-    date: "2024-02-20",
-    location: {
-      lat: -12.1167,
-      lng: -77.0167,
-      address: "Costa Verde, Miraflores, Lima",
-    },
-    organizationId: "2",
-    organizationName: "OceanGuard",
-    participants: ["3"],
-    maxParticipants: 30,
-    finished: false,
-    category: "cleanup",
-    images: ["/placeholder.svg?height=300&width=500"],
-  },
-  {
-    id: "3",
-    name: "Taller de Compostaje",
-    description:
-      "Aprende técnicas de compostaje urbano y sostenibilidad doméstica. Incluye kit básico de compostaje.",
-    date: "2024-01-10",
-    location: {
-      lat: -12.05,
-      lng: -77.05,
-      address: "Centro Comunitario San Isidro",
-    },
-    organizationId: "1",
-    organizationName: "EcoLima",
-    participants: ["1", "2", "3"],
-    maxParticipants: 20,
-    finished: true,
-    category: "education",
-    images: ["/placeholder.svg?height=300&width=500"],
-  },
-];
+
+// We are using the API types (ApiEvent) and React Query hooks to load real events
 
 const categoryLabels = {
   reforestation: "Reforestación",
@@ -130,124 +61,118 @@ const categoryColors = {
 export default function EventsPage() {
   const { user, hasRole } = useAuth();
   const { toast } = useToast();
-  const [events, setEvents] = useState<Event[]>(mockEvents);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "upcoming" | "finished"
   >("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isCreateEventDialogOpen, setIsCreateEventDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ApiEvent | null>(null);
+  const [formData, setFormData] = useState<any>({
+    name: "",
+    description: "",
+    direction: "",
+    date: "",
+    latitude: 0,
+    longitude: 0,
+    finished: false,
+  });
+
   const userOrganizationId = user?.organizationId
     ? Number(user.organizationId)
     : undefined;
+
+  // React Query hooks
+  const { data: eventsResp, isLoading, isError } = useGetEvents();
+  const deleteMutation = useDeleteEvent();
+  const updateMutation = useUpdateEvent();
+
+  // normalize list
+  const events: ApiEvent[] =
+    (eventsResp && ((eventsResp as any).payload || (eventsResp as any).events)) ||
+    [];
+
   const filteredEvents = events.filter((event) => {
+    const name = (event as any).name || "";
+    const description = (event as any).description || "";
+    const orgName = (event as any).organizationName || String((event as any).idOrganization || "");
+
     const matchesSearch =
-      event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.organizationName.toLowerCase().includes(searchTerm.toLowerCase());
+      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      orgName.toLowerCase().includes(searchTerm.toLowerCase());
 
-    console.log("User object from useAuth:", user); // Log the entire user object
-
-    // Check the SPECIFIC property you expect for the organization ID
-    // Replace 'organizationId' if the actual property name is different
-    const orgIdFromUser = user?.organizationId;
-    console.log("Organization ID directly from user:", orgIdFromUser);
-
-    const userOrganizationId = orgIdFromUser
-      ? Number(orgIdFromUser)
-      : undefined;
-    console.log("Processed userOrganizationId:", userOrganizationId);
+    const finished = Boolean((event as any).finished);
 
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "upcoming" && !event.finished) ||
-      (statusFilter === "finished" && event.finished);
+      (statusFilter === "upcoming" && !finished) ||
+      (statusFilter === "finished" && finished);
 
+    // Category is optional in API - if present, filter it
     const matchesCategory =
-      categoryFilter === "all" || event.category === categoryFilter;
+      categoryFilter === "all" || (event as any).category === categoryFilter;
 
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const handleJoinEvent = (eventId: string) => {
-    const event = events.find((e) => e.id === eventId);
-    if (!event || !user) return;
+  const canCreateEvent = () => hasRole("ROLE_ORGANIZATION");
 
-    if (event.participants.includes(user.id)) {
-      toast({
-        title: "Ya estás registrado",
-        description: "Ya te has unido a este evento.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const canEditEvent = (event: ApiEvent) => {
+    const userOrg = user?.organizationId ? Number(user.organizationId) : undefined;
+    const eventOrg = (event as any).idOrganization ? Number((event as any).idOrganization) : undefined;
+    return hasRole("ROLE_ORGANIZATION") && userOrg && eventOrg && userOrg === eventOrg;
+  };
 
-    if (
-      event.maxParticipants &&
-      event.participants.length >= event.maxParticipants
-    ) {
-      toast({
-        title: "Evento lleno",
-        description: "Este evento ha alcanzado el máximo de participantes.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === eventId
-          ? { ...e, participants: [...e.participants, user.id] }
-          : e
-      )
-    );
-
-    toast({
-      title: "¡Te has unido al evento!",
-      description: `Te has registrado exitosamente para "${event.name}".`,
+  const openEditDialog = (event: ApiEvent) => {
+    setEditingEvent(event);
+    setFormData({
+      name: (event as any).name || "",
+      description: (event as any).description || "",
+      direction: (event as any).direction || "",
+      date: (event as any).date || "",
+      latitude: (event as any).latitude || 0,
+      longitude: (event as any).longitude || 0,
+      finished: Boolean((event as any).finished),
     });
   };
 
-  const handleLeaveEvent = (eventId: string) => {
-    if (!user) return;
-
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === eventId
-          ? { ...e, participants: e.participants.filter((p) => p !== user.id) }
-          : e
-      )
-    );
-
-    toast({
-      title: "Has salido del evento",
-      description: "Tu registro ha sido cancelado exitosamente.",
+  const handleDeleteEvent = (id: number | string) => {
+    if (!confirm("¿Estás seguro de eliminar este evento?")) return;
+    deleteMutation.mutate(Number(id), {
+      onSuccess: () => {
+        toast({ title: "Evento eliminado", description: "El evento fue eliminado correctamente." });
+      },
+      onError: (err: any) => {
+        toast({ title: "Error", description: err?.message || "No se pudo eliminar el evento.", variant: "destructive" });
+      },
     });
   };
 
-  const isUserJoined = (event: Event) => {
-    return user ? event.participants.includes(user.id) : false;
-  };
+  const handleEditEvent = () => {
+    if (!editingEvent) return;
 
-  const isEventFull = (event: Event) => {
-    return event.maxParticipants
-      ? event.participants.length >= event.maxParticipants
-      : false;
-  };
+    const payload: Omit<ApiEvent, "id"> = {
+      name: formData.name,
+      description: formData.description,
+      direction: formData.direction,
+      date: formData.date,
+      latitude: Number(formData.latitude) || 0,
+      longitude: Number(formData.longitude) || 0,
+      idOrganization: (editingEvent as any).idOrganization,
+      idOrganizer: (editingEvent as any).idOrganizer,
+      finished: Boolean(formData.finished),
+    } as any;
 
-  const canCreateEvent = () => {
-    return hasRole("ROLE_ORGANIZATION");
-  };
-
-  const canEditEvent = (event: Event) => {
-    return (
-      hasRole("ROLE_ORGANIZATION") &&
-      user?.organizationId === event.organizationId
-    );
-  };
-
-  const canJoinEvent = () => {
-    return hasRole("ROLE_USER") || hasRole("ROLE_ORGANIZATION");
+    updateMutation.mutate({ idEvent: Number(editingEvent.id), event: payload }, {
+      onSuccess: () => {
+        toast({ title: "Evento actualizado", description: "Los cambios se guardaron correctamente." });
+        setEditingEvent(null);
+      },
+      onError: (err: any) => {
+        toast({ title: "Error", description: err?.message || "No se pudo actualizar el evento.", variant: "destructive" });
+      },
+    });
   };
 
   return (
@@ -369,9 +294,9 @@ export default function EventsPage() {
                           <CardTitle className="text-xl">
                             {event.name}
                           </CardTitle>
-                          <Badge className={categoryColors[event.category]}>
+                          {/* <Badge className={categoryColors[event.category]}>
                             {categoryLabels[event.category]}
-                          </Badge>
+                          </Badge> */}
                           {event.finished && (
                             <Badge variant="secondary">Finalizado</Badge>
                           )}
@@ -382,56 +307,39 @@ export default function EventsPage() {
                         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            {new Date(event.date).toLocaleDateString("es-ES")}
+                            {(event as any).date ? new Date((event as any).date).toLocaleDateString("es-ES") : "-"}
                           </div>
                           <div className="flex items-center gap-1">
                             <MapPin className="h-4 w-4" />
-                            {event.location.address}
+                            {(event as any).direction || (event as any).location?.address || "-"}
                           </div>
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4" />
-                            {event.participants.length}
-                            {event.maxParticipants &&
-                              ` / ${event.maxParticipants}`}{" "}
+                            {(event as any).participants ? (event as any).participants.length : ((event as any).participantsCount ?? 0)}
+                            {(event as any).maxParticipants ? ` / ${(event as any).maxParticipants}` : ""}{" "}
                             participantes
                           </div>
                           <div className="text-green-600 font-medium">
-                            {event.organizationName}
-                          </div>
-                          <div className="text-green-600 font-medium">
-                            {event.organizationName}
+                            {(event as any).organizationName || `Org ${String((event as any).idOrganization || "")}`}
                           </div>
                         </div>
                       </div>
 
-                      {!event.finished && canJoinEvent() && (
-                        <div className="ml-4">
-                          {isUserJoined(event) ? (
-                            <Button
-                              variant="outline"
-                              onClick={() => handleLeaveEvent(event.id)}
-                              className="text-red-600 border-red-600 hover:bg-red-50"
-                            >
-                              Salir del Evento
+                      <div className="ml-4 flex items-center gap-2">
+                        {canEditEvent(event) && (
+                          <>
+                            <Button variant="outline" onClick={() => openEditDialog(event)}>
+                              Editar
                             </Button>
-                          ) : (
-                            <Button
-                              onClick={() => handleJoinEvent(event.id)}
-                              disabled={isEventFull(event)}
-                              className={
-                                isEventFull(event)
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : ""
-                              }
-                            >
-                              {isEventFull(event) ? "Evento Lleno" : "Unirse"}
+                            <Button variant="destructive" onClick={() => handleDeleteEvent(event.id)}>
+                              Eliminar
                             </Button>
-                          )}
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
-                  {event.images && event.images.length > 0 && (
+                  {/* {event.images && event.images.length > 0 && (
                     <div className="px-6">
                       <img
                         src={event.images[0] || "/placeholder.svg"}
@@ -439,7 +347,7 @@ export default function EventsPage() {
                         className="w-full h-48 object-cover rounded-lg mb-4"
                       />
                     </div>
-                  )}
+                  )} */}
                   <CardContent className="pt-0">
                     {/* El resto del contenido permanece igual */}
                   </CardContent>
@@ -447,6 +355,65 @@ export default function EventsPage() {
               ))
             )}
           </div>
+
+          {/* Edit Dialog */}
+          <Dialog open={!!editingEvent} onOpenChange={() => setEditingEvent(null)}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Editar Evento</DialogTitle>
+                <DialogDescription>Actualiza la información del evento</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Nombre</label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData((prev:any) => ({ ...prev, name: e.target.value }))}
+                    placeholder="Nombre del evento"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Dirección</label>
+                  <Input
+                    value={formData.direction}
+                    onChange={(e) => setFormData((prev:any) => ({ ...prev, direction: e.target.value }))}
+                    placeholder="Dirección o ubicación"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Fecha</label>
+                    <Input type="date" value={formData.date} onChange={(e) => setFormData((prev:any) => ({ ...prev, date: e.target.value }))} />
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="w-1/2">
+                      <label className="text-sm font-medium">Latitud</label>
+                      <Input type="number" value={formData.latitude} onChange={(e) => setFormData((prev:any) => ({ ...prev, latitude: Number(e.target.value) }))} />
+                    </div>
+                    <div className="w-1/2">
+                      <label className="text-sm font-medium">Longitud</label>
+                      <Input type="number" value={formData.longitude} onChange={(e) => setFormData((prev:any) => ({ ...prev, longitude: Number(e.target.value) }))} />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Descripción</label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData((prev:any) => ({ ...prev, description: e.target.value }))}
+                    placeholder="Describe el evento..."
+                    rows={6}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setEditingEvent(null)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleEditEvent}>Guardar Cambios</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </Layout>
     </ProtectedRoute>

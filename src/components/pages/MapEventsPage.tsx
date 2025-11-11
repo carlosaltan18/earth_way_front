@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import type { Map as LeafletMap } from "leaflet";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useGetEvents } from "@/features/event/queries";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,7 +39,7 @@ interface MapEvent {
   category: "reforestation" | "cleanup" | "education" | "conservation";
   lat: number;
   lng: number;
-  address: string;
+  direction: string;
   date: string;
   description: string;
   organizationName: string;
@@ -63,7 +64,7 @@ const MapComponentDynamic = dynamic(
 );
 
 // Mock events data for map
-const mockMapEvents: MapEvent[] = [
+/* const mockMapEvents: MapEvent[] = [
   {
     id: "1",
     name: "Reforestación Cerro Verde",
@@ -104,7 +105,7 @@ const mockMapEvents: MapEvent[] = [
     participants: 32,
   },
 ];
-
+ */
 const categoryIcons = {
   reforestation: TreePine,
   cleanup: Trash2,
@@ -132,11 +133,14 @@ const statusLabels = {
 export default function MapEventsPage() {
   
   const { isAuthenticated } = useAuth();
-  const [events] = useState<MapEvent[]>(mockMapEvents);
+  // const [events] = useState<MapEvent[]>(mockMapEvents);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
 
+
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
+  
 
   const queryEvents = useGetEvents();
   
@@ -173,13 +177,23 @@ export default function MapEventsPage() {
       return [...eventPoints];
     }, [queryEvents.data]);
 
-  const filteredEvents = events.filter((event) => {
+  /* const filteredEvents = events.filter((event) => {
     const matchesCategory =
       selectedCategory === "all" || event.category === selectedCategory;
     const matchesStatus =
       selectedStatus === "all" || event.status === selectedStatus;
     return matchesCategory && matchesStatus;
-  });
+  }); */
+
+  // Función para enfocar en un punto
+    const focusOn = useCallback((lat: number, lng: number, zoom = 15) => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setView([lat, lng], zoom, {
+          animate: true,
+          duration: 0.5,
+        });
+      }
+    }, []);
 
   return (
     <Layout>
@@ -298,33 +312,36 @@ export default function MapEventsPage() {
             {/* Events List */}
             <Card>
               <CardHeader>
-                <CardTitle>Eventos ({filteredEvents.length})</CardTitle>
+                <CardTitle>Eventos ({points.length})</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
-                {filteredEvents.map((event) => {
-                  const IconComponent = categoryIcons[event.category];
+                {points.map((p) => {
+                 //  const IconComponent = categoryIcons[event.category];
                   return (
                     <div
-                      key={event.id}
+                      key={p.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 ${
-                        selectedEvent?.id === event.id
+                        selectedEvent?.id === p.id
                           ? "border-green-500 bg-green-50"
                           : "border-gray-200"
                       }`}
-                      onClick={() => setSelectedEvent(event)}
+                      onClick={() => setSelectedEvent(p.raw)}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-gray-100">
+                        {/* <div className="p-2 rounded-lg bg-gray-100">
                           <IconComponent className="h-4 w-4" />
-                        </div>
+                        </div> */}
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm truncate">
-                            {event.name}
+                            {p.title}
                           </h4>
                           <p className="text-xs text-gray-500 mt-1">
-                            {event.address}
+                            {p.subtitle}
                           </p>
-                          <div className="flex items-center gap-2 mt-2">
+                          <p className="text-xs text-gray-500 mt-1">
+                            Coordenadas: {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
+                          </p>
+                          {/* <div className="flex items-center gap-2 mt-2">
                             <Badge
                               className={`text-xs ${
                                 categoryColors[event.category]
@@ -334,19 +351,19 @@ export default function MapEventsPage() {
                             </Badge>
                             <Badge
                               className={`text-xs ${
-                                statusColors[event.status]
+                                statusColors[p.status]
                               }`}
                             >
                               {statusLabels[event.status]}
                             </Badge>
-                          </div>
+                          </div> */}
                         </div>
                       </div>
                     </div>
                   );
                 })}
 
-                {filteredEvents.length === 0 && (
+                {points.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>No hay eventos que coincidan con los filtros</p>
@@ -362,14 +379,14 @@ export default function MapEventsPage() {
                   <CardTitle className="text-lg">
                     {selectedEvent.name}
                   </CardTitle>
-                  <div className="flex gap-2">
+                  {/* <div className="flex gap-2">
                     <Badge className={categoryColors[selectedEvent.category]}>
                       {selectedEvent.category}
                     </Badge>
                     <Badge className={statusColors[selectedEvent.status]}>
                       {statusLabels[selectedEvent.status]}
                     </Badge>
-                  </div>
+                  </div> */}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-gray-600">
@@ -379,7 +396,7 @@ export default function MapEventsPage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-gray-400" />
-                      <span>{selectedEvent.address}</span>
+                      <span>{selectedEvent.direction}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-gray-400" />

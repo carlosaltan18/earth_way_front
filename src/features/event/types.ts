@@ -2,7 +2,7 @@ export type Event = {
   id: number;
   name: string;
   description: string;
-  direction: string; // Cambio: era "date", ahora es "direction"
+  direction: string; 
   date?: string;
   latitude?: number;
   longitude?: number;

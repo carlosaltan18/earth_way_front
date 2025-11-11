@@ -28,6 +28,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Event as EventType } from "@/features/event/types"
+import { useCreateEvent, useGetEvents, useDeleteEvent, useUpdateEvent } from "@/features/event/queries"
+
 import {
   Users,
   Calendar,
@@ -335,17 +338,32 @@ const hasRole = (role: string | UserRole): boolean => {
     data: reportsData,
     isLoading: isLoadingReports,
     error: reportsError,
-    refetch: refetchReports,
-  } = useGetReports();
+    refetch: refetchReports
+  } = useGetReports()
+
+  const{
+    data: eventsData,
+    isLoading: isLoadingEvents,
+    error: eventsError,
+    refetch: refetchEvents
+  } = useGetEvents()
+
 
   // Get available roles
-  const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
-  const { mutate: addRole, isPending: isAddingRole } = useAddRoleToUser();
-  const { mutate: removeRole, isPending: isRemovingRole } = useRemoveRoleFromUser();
-  const { mutate: createReport, isPending: isCreatingReport } = useCreateReport();
-  const { mutate: deleteReport, isPending: isDeletingReport } = useDeleteReport();
-  const { mutate: patchReport, isPending: isPatchingReport } = usePatchReport();
-  const { mutate: updateReport, isPending: isUpdatingReport } = useUpdateReport();
+const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
+  const { mutate: addRole, isPending: isAddingRole } = useAddRoleToUser()
+  const { mutate: removeRole, isPending: isRemovingRole } = useRemoveRoleFromUser()
+  const { mutate: createReport, isPending: isCreatingReport } = useCreateReport()
+  const { mutate: deleteReport, isPending: isDeletingReport } = useDeleteReport()
+  const { mutate: patchReport, isPending: isPatchingReport } = usePatchReport()
+  const { mutate: updateReport, isPending: isUpdatingReport } = useUpdateReport()
+
+  //Event mutations
+  const { mutate: createEvent, isPending: isCreatingEvent} = useCreateEvent()
+  const { mutate: deleteEvent, isPending: isDeletingEvent} = useDeleteEvent()
+  const { mutate: updateEvent, isPending: isUpdatingEvent} = useUpdateEvent()
+
+
 
   // Listar Usuarios desde la API -> mapeo y setUsers
   useEffect(() => {
@@ -397,7 +415,27 @@ const hasRole = (role: string | UserRole): boolean => {
 
       setReports(mappedReports);
     }
-  }, [reportsData]);
+  }, [reportsData])
+
+  //Listar Events desde la API
+  useEffect(() => {
+  if (eventsData?.payload && Array.isArray(eventsData.payload)) {
+    const mappedEvents: DashboardEvent[] = eventsData.payload.map((event: EventType) => ({
+      id: event.id.toString(),
+      name: event.name,
+      description: event.description,
+      date: event.date || new Date().toISOString(),
+      location: event.direction || '',
+      organizationId: event.idOrganization?.toString() || "",
+      organizationName: "Organización", 
+      participants: 0,
+      category: "reforestation", 
+      finished: event.finished || false
+    }));
+
+    setEvents(mappedEvents);
+  }
+}, [eventsData]);
 
   // Manejo de errores usuarios y reportes
   useEffect(() => {
@@ -497,7 +535,7 @@ const hasRole = (role: string | UserRole): boolean => {
 
   // Form states
   const [userForm, setUserForm] = useState({ name: "", email: "", phone: "", password: "" });
-  const [eventForm, setEventForm] = useState({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" as DashboardEvent["category"] | "" });
+  const [eventForm, setEventForm] = useState({ name: "", description: "", date: "", location: null as { lat: number; lng: number } | string | null, maxParticipants: "", category: "" as DashboardEvent["category"] | "", idOrganization: "" });
   const [orgForm, setOrgForm] = useState({ name: "", description: "", contactEmail: "", contactPhone: "", creatorId: null as number | null, logo: "", editing: false });
   const [reportForm, setReportForm] = useState({ title: "", description: "", location: null as { lat: number; lng: number } | null, editing: false });
 
@@ -532,48 +570,101 @@ const hasRole = (role: string | UserRole): boolean => {
 
   // CRUD Events
   const handleCreateEvent = () => {
-    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date || !eventForm.category) {
-      toast({ title: "Error", description: "Por favor completa todos los campos obligatorios.", variant: "destructive" });
+    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos obligatorios.",
+        variant: "destructive",
+      });
       return;
     }
-    const newEvent: DashboardEvent = {
-      id: Date.now().toString(),
+
+    const loc = eventForm.location as { lat: number; lng: number } | string | null;
+    const payloadCreate: Omit<EventType, "id"> = {
       name: eventForm.name,
       description: eventForm.description,
+      direction: typeof loc === "string" ? loc : loc ? `${loc.lat.toFixed(6)},${loc.lng.toFixed(6)}` : "",
       date: eventForm.date,
-      location: eventForm.location,
-      organizationId: user?.organizationId || "1",
-      organizationName: user?.name || "Organización",
-      participants: 0,
-      maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined,
-      category: eventForm.category as DashboardEvent["category"],
+      idOrganization: eventForm.idOrganization ? Number(eventForm.idOrganization) : undefined,
       finished: false,
+      latitude: typeof loc === "object" && loc ? loc.lat : undefined,
+      longitude: typeof loc === "object" && loc ? loc.lng : undefined,
     };
-    setEvents((prev) => [newEvent, ...prev]);
-    setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" });
-    setIsEventDialogOpen(false);
-    toast({ title: "Evento creado", description: "El evento ha sido creado exitosamente." });
+
+    createEvent(
+      payloadCreate,
+      {
+        onSuccess: () => {
+          toast({ title: "Evento creado", description: "El evento ha sido creado exitosamente." });
+          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "", idOrganization: "" });
+          setIsEventDialogOpen(false);
+          try { refetchEvents?.(); } catch (e) { /* ignore */ }
+        },
+        onError: (error: any) => {
+          toast({ title: "Error", description: `No se pudo crear el evento: ${error?.message || "Error desconocido"}`, variant: "destructive" });
+          console.error("createEvent error:", error);
+        },
+      }
+    );
   };
 
   const handleEditEvent = () => {
-    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date || !eventForm.category) {
-      toast({ title: "Error", description: "Por favor completa todos los campos obligatorios.", variant: "destructive" });
+    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date || !editingEvent) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos obligatorios.",
+        variant: "destructive",
+      });
       return;
     }
-    setEvents((prev) => prev.map((ev) => ev.id === editingEvent!.id ? { ...ev, name: eventForm.name, description: eventForm.description, date: eventForm.date, location: eventForm.location, maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined, category: eventForm.category as DashboardEvent["category"] } : ev ));
-    setEditingEvent(null);
-    setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" });
-    toast({ title: "Evento actualizado", description: "Los cambios han sido guardados exitosamente." });
+
+    const locUp = eventForm.location as { lat: number; lng: number } | string | null;
+    const payloadUpdate: { idEvent: number; event: Omit<EventType, "id"> } = {
+      idEvent: Number(editingEvent.id),
+      event: {
+        name: eventForm.name,
+        description: eventForm.description,
+        direction: typeof locUp === "string" ? locUp : locUp ? `${locUp.lat.toFixed(6)},${locUp.lng.toFixed(6)}` : "",
+        date: eventForm.date,
+        idOrganization: eventForm.idOrganization ? Number(eventForm.idOrganization) : undefined,
+        finished: editingEvent.finished,
+        latitude: typeof locUp === "object" && locUp ? locUp.lat : undefined,
+        longitude: typeof locUp === "object" && locUp ? locUp.lng : undefined,
+      },
+    };
+
+    updateEvent(payloadUpdate,
+      {
+        onSuccess: () => {
+          toast({ title: "Evento actualizado", description: "Los cambios han sido guardados exitosamente." });
+          setEditingEvent(null);
+          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "", idOrganization: "" });
+          try { refetchEvents?.(); } catch (e) { /* ignore */ }
+        },
+        onError: (error: any) => {
+          toast({ title: "Error", description: `No se pudo actualizar el evento: ${error?.message || "Error desconocido"}`, variant: "destructive" });
+          console.error("updateEvent error:", error);
+        },
+      }
+    );
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== eventId));
-    toast({ title: "Evento eliminado", description: "El evento ha sido eliminado del sistema." });
+    deleteEvent(Number(eventId), {
+      onSuccess: () => {
+        toast({ title: "Evento eliminado", description: "El evento ha sido eliminado del sistema." });
+        try { refetchEvents?.(); } catch (e) { /* ignore */ }
+      },
+      onError: (error: any) => {
+        toast({ title: "Error", description: `No se pudo eliminar el evento: ${error?.message || "Error desconocido"}`, variant: "destructive" });
+        console.error("deleteEvent error:", error);
+      },
+    });
   };
 
   const openEditEventDialog = (event: DashboardEvent) => {
     setEditingEvent(event);
-    setEventForm({ name: event.name, description: event.description, date: event.date, location: event.location, maxParticipants: event.maxParticipants?.toString() || "", category: event.category });
+    setEventForm({ name: event.name, description: event.description, date: event.date, location: null, maxParticipants: event.maxParticipants?.toString() || "", category: event.category, idOrganization: event.organizationId });
   };
 
   // Posts
@@ -582,7 +673,7 @@ const hasRole = (role: string | UserRole): boolean => {
     toast({ title: "Publicación eliminada", description: "La publicación ha sido eliminada del sistema." });
   };
 
-  // Organizations CRUD (usa tus mutations)
+  // Organizations CRUD 
   const handleCreateOrganization = () => {
     if (!orgForm.name.trim() || !orgForm.description.trim() || !orgForm.contactEmail.trim() || !orgForm.contactPhone.trim() || !orgForm.creatorId) {
       toast({ title: "Error", description: "Por favor completa todos los campos obligatorios.", variant: "destructive" });
@@ -796,6 +887,16 @@ const hasRole = (role: string | UserRole): boolean => {
                 openEditEventDialog={openEditEventDialog}
                 setIsEventDialogOpen={setIsEventDialogOpen}
                 handleDeleteEvent={handleDeleteEvent}
+                isEventDialogOpen={isEventDialogOpen}
+                eventForm={eventForm}
+                setEventForm={setEventForm}
+                handleCreateEvent={handleCreateEvent}
+                handleEditEvent={handleEditEvent}
+                isCreatingEvent={isCreatingEvent}
+                isUpdatingEvent={isUpdatingEvent}
+                isDeletingEvent={isDeletingEvent}
+                editingEvent={editingEvent}
+                organizations={organizations}
                 hasRole={hasRole}
                 categoryLabels={categoryLabels}
               />
