@@ -60,7 +60,8 @@ export default function ImageUploader({
           title: "Imagen subida",
           description: "El logo ha sido subido exitosamente",
         });
-        onImageSelected(data.url);
+        // ✅ Cambio: usar imageUrl en lugar de url
+        onImageSelected(data.imageUrl);
       },
       onError: (error: Error) => {
         toast({
@@ -99,6 +100,11 @@ export default function ImageUploader({
     }
   };
 
+  const handleRemoveImage = () => {
+    setPreview(null);
+    onImageSelected("");
+  };
+
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-gray-700">{label}</label>
@@ -113,15 +119,22 @@ export default function ImageUploader({
             className="object-contain"
           />
           <button
-            onClick={() => {
-              setPreview(null);
-              onImageSelected("");
-            }}
+            onClick={handleRemoveImage}
             disabled={isUploading}
             className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full transition-colors disabled:bg-gray-400"
           >
             <X className="h-4 w-4" />
           </button>
+
+          {/* Loading State con Preview */}
+          {isUploading && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-6 w-6 text-white animate-spin" />
+                <p className="text-xs text-white">Subiendo...</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -166,14 +179,6 @@ export default function ImageUploader({
               </>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {preview && isUploading && (
-        <div className="flex items-center gap-2 text-sm text-blue-600">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Subiendo imagen...
         </div>
       )}
     </div>

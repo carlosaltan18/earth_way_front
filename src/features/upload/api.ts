@@ -1,9 +1,9 @@
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/apiUpload";
 
+// Corresponde exactamente con lo que devuelve tu backend
 export type UploadResponse = {
-  url: string;
-  filename: string;
-  size: number;
+  imageUrl: string;
+  message: string;
 };
 
 export const uploadApi = {
@@ -15,9 +15,12 @@ export const uploadApi = {
       const response = await api.post("/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      
+      // Axios automáticamente deserializa el JSON
       return response.data;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }
   },
 };
+
