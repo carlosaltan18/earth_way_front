@@ -535,7 +535,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
 
   // Form states
   const [userForm, setUserForm] = useState({ name: "", email: "", phone: "", password: "" });
-  const [eventForm, setEventForm] = useState({ name: "", description: "", date: "", location: null as { lat: number; lng: number } | string | null, maxParticipants: "", category: "" as DashboardEvent["category"] | "" });
+  const [eventForm, setEventForm] = useState({ name: "", description: "", date: "", location: null as { lat: number; lng: number } | string | null, maxParticipants: "", category: "" as DashboardEvent["category"] | "", idOrganization: "" });
   const [orgForm, setOrgForm] = useState({ name: "", description: "", contactEmail: "", contactPhone: "", creatorId: null as number | null, logo: "", editing: false });
   const [reportForm, setReportForm] = useState({ title: "", description: "", location: null as { lat: number; lng: number } | null, editing: false });
 
@@ -585,7 +585,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
       description: eventForm.description,
       direction: typeof loc === "string" ? loc : loc ? `${loc.lat.toFixed(6)},${loc.lng.toFixed(6)}` : "",
       date: eventForm.date,
-      idOrganization: user?.organizationId ? Number(user.organizationId) : undefined,
+      idOrganization: eventForm.idOrganization ? Number(eventForm.idOrganization) : undefined,
       finished: false,
       latitude: typeof loc === "object" && loc ? loc.lat : undefined,
       longitude: typeof loc === "object" && loc ? loc.lng : undefined,
@@ -596,7 +596,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
       {
         onSuccess: () => {
           toast({ title: "Evento creado", description: "El evento ha sido creado exitosamente." });
-          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "" });
+          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "", idOrganization: "" });
           setIsEventDialogOpen(false);
           try { refetchEvents?.(); } catch (e) { /* ignore */ }
         },
@@ -626,7 +626,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
         description: eventForm.description,
         direction: typeof locUp === "string" ? locUp : locUp ? `${locUp.lat.toFixed(6)},${locUp.lng.toFixed(6)}` : "",
         date: eventForm.date,
-        idOrganization: user?.organizationId ? Number(user.organizationId) : undefined,
+        idOrganization: eventForm.idOrganization ? Number(eventForm.idOrganization) : undefined,
         finished: editingEvent.finished,
         latitude: typeof locUp === "object" && locUp ? locUp.lat : undefined,
         longitude: typeof locUp === "object" && locUp ? locUp.lng : undefined,
@@ -638,7 +638,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
         onSuccess: () => {
           toast({ title: "Evento actualizado", description: "Los cambios han sido guardados exitosamente." });
           setEditingEvent(null);
-          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "" });
+          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "", idOrganization: "" });
           try { refetchEvents?.(); } catch (e) { /* ignore */ }
         },
         onError: (error: any) => {
@@ -664,7 +664,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
 
   const openEditEventDialog = (event: DashboardEvent) => {
     setEditingEvent(event);
-  setEventForm({ name: event.name, description: event.description, date: event.date, location: null, maxParticipants: event.maxParticipants?.toString() || "", category: event.category });
+    setEventForm({ name: event.name, description: event.description, date: event.date, location: null, maxParticipants: event.maxParticipants?.toString() || "", category: event.category, idOrganization: event.organizationId });
   };
 
   // Posts
@@ -896,6 +896,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                 isUpdatingEvent={isUpdatingEvent}
                 isDeletingEvent={isDeletingEvent}
                 editingEvent={editingEvent}
+                organizations={organizations}
                 hasRole={hasRole}
                 categoryLabels={categoryLabels}
               />

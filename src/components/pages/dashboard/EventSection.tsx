@@ -8,6 +8,7 @@ import { Search, Calendar, MapPin, Users, Building, Edit, Trash2, Plus } from "l
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import dynamic from "next/dynamic";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
@@ -32,6 +33,7 @@ export default function EventSection({
   isUpdatingEvent,
   isDeletingEvent,
   editingEvent,
+  organizations,
 }: {
   events: any[];
   eventSearch: string;
@@ -51,6 +53,7 @@ export default function EventSection({
   isUpdatingEvent: boolean;
   isDeletingEvent: boolean;
   editingEvent: any | null;
+  organizations: any[];
 }) {
   return (
     <Card>
@@ -75,6 +78,22 @@ export default function EventSection({
                   </DialogHeader>
 
                   <div className="space-y-4">
+                    <div>
+                      <Label>Organización *</Label>
+                      <Select value={eventForm.idOrganization} onValueChange={(value) => setEventForm((prev: any) => ({ ...prev, idOrganization: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una organización" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {organizations.map((org) => (
+                            <SelectItem key={org.id} value={org.id}>
+                              {org.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div>
                       <Label>Nombre del evento</Label>
                       <Input value={eventForm.name} onChange={(e) => setEventForm((prev: any) => ({ ...prev, name: e.target.value }))} placeholder="Ej: Reforestación Parque Central" />
@@ -135,7 +154,11 @@ export default function EventSection({
                       <div className="flex items-center gap-2"><Calendar className="h-4 w-4 flex-shrink-0" />{new Date(event.date).toLocaleDateString("es-ES")}</div>
                       <div className="flex items-center gap-2"><MapPin className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{event.location}</span></div>
                       <div className="flex items-center gap-2"><Users className="h-4 w-4 flex-shrink-0" />{event.participants} participantes{event.maxParticipants && ` / ${event.maxParticipants}`}</div>
-                      <div className="flex items-center gap-2"><Building className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{event.organizationName}</span></div>
+                      <div className="flex items-center gap-2"><Building className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{(() => {
+                        const org = organizations.find((o) => o.id === event.organizationId);
+                        console.log("Buscando org con id:", event.organizationId, "Orgs disponibles:", organizations.map(o => o.id), "Org encontrada:", org?.name);
+                        return org?.name || "Organización no encontrada";
+                      })()}</span></div>
                     </div>
                   </div>
 
