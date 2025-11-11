@@ -27,7 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Edit, Trash2, Search, Calendar, User, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Calendar, User, Loader2, Image as ImageIcon } from "lucide-react"
 import Link from "next/link"
 import {
   useListPosts,
@@ -36,9 +36,8 @@ import {
   useDeletePostByUser,
   useDeletePostByAdmin,
 } from "@/features/post/queries"
-import type { Post as PostType, DisplayPost as DisplayPost } from "@/features/post/types"
-
-
+import type { Post as PostType, DisplayPost } from "@/features/post/types"
+import { api } from "@/lib/apiUpload" // usamos tu apiUpload.ts
 
 export default function PostsPage() {
   const { user, isAuthenticated } = useAuth()
@@ -49,7 +48,9 @@ export default function PostsPage() {
   const [formData, setFormData] = useState({
     title: "",
     content: "",
+    images: [] as string[],
   })
+  const [isUploading, setIsUploading] = useState(false)
 
   // Queries
   const { data: postsData, isLoading, error } = useListPosts()
@@ -60,10 +61,9 @@ export default function PostsPage() {
   const { mutate: deletePostByUser } = useDeletePostByUser()
   const { mutate: deletePostByAdmin } = useDeletePostByAdmin()
 
-  // Transform API data to display format
+  // Transformar datos de la API
   const posts: DisplayPost[] = useMemo(() => {
-    if (!postsData) return [];
-
+    if (!postsData) return []
     return postsData.payload.map((post: PostType): DisplayPost => ({
       id: post.id.toString(),
       title: post.title,
@@ -74,8 +74,8 @@ export default function PostsPage() {
         ? `${post.author.name} ${post.author.surname}`.trim()
         : "Autor desconocido",
       images: post.images || [],
-    }));
-  }, [postsData]);
+    }))
+  }, [postsData])
 
   const filteredPosts = posts.filter(
     (post) =>
@@ -84,6 +84,43 @@ export default function PostsPage() {
       post.authorName.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // 📤 Subida de imagen al servidor
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      const formDataUpload = new FormData()
+      formDataUpload.append("file", file)
+
+      const response = await api.post("/upload", formDataUpload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+
+      const imageUrl = response.data.imageUrl
+      setFormData((prev) => ({
+        ...prev,
+        images: [...prev.images, imageUrl],
+      }))
+
+      toast({
+        title: "Imagen subida",
+        description: "La imagen se subió correctamente.",
+      })
+    } catch (error) {
+      console.error("Error uploading image:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo subir la imagen.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Crear post
   const handleCreatePost = () => {
     if (!formData.title.trim() || !formData.content.trim()) {
       toast({
@@ -99,11 +136,11 @@ export default function PostsPage() {
         title: formData.title,
         content: formData.content,
         postDate: new Date().toISOString().split("T")[0],
-        images: [],
+        images: formData.images,
       },
       {
         onSuccess: () => {
-          setFormData({ title: "", content: "" })
+          setFormData({ title: "", content: "", images: [] })
           setIsCreateDialogOpen(false)
           toast({
             title: "¡Publicación creada!",
@@ -111,17 +148,18 @@ export default function PostsPage() {
           })
         },
         onError: (error) => {
+          console.error("Error creating post:", error)
           toast({
             title: "Error",
             description: "No se pudo crear la publicación.",
             variant: "destructive",
           })
-          console.error("Error creating post:", error)
         },
       }
     )
   }
 
+  // Editar post
   const handleEditPost = () => {
     if (!formData.title.trim() || !formData.content.trim() || !editingPost) {
       toast({
@@ -140,25 +178,25 @@ export default function PostsPage() {
           title: formData.title,
           content: formData.content,
           postDate: editingPost.postDate,
-          images: editingPost.images || [],
+          images: formData.images,
         },
       },
       {
         onSuccess: () => {
           setEditingPost(null)
-          setFormData({ title: "", content: "" })
+          setFormData({ title: "", content: "", images: [] })
           toast({
             title: "¡Publicación actualizada!",
-            description: "Los cambios han sido guardados exitosamente.",
+            description: "Los cambios se guardaron exitosamente.",
           })
         },
         onError: (error) => {
+          console.error("Error updating post:", error)
           toast({
             title: "Error",
             description: "No se pudo actualizar la publicación.",
             variant: "destructive",
           })
-          console.error("Error updating post:", error)
         },
       }
     )
@@ -169,49 +207,30 @@ export default function PostsPage() {
     const postId = Number(post.id)
     const userId = Number(user?.id)
 
-    if (isAdmin) {
-      deletePostByAdmin(postId, {
-        onSuccess: () => {
-          toast({
-            title: "Publicación eliminada",
-            description: "La publicación ha sido eliminada exitosamente.",
-          })
-        },
-        onError: (error) => {
-          toast({
-            title: "Error",
-            description: "No se pudo eliminar la publicación.",
-            variant: "destructive",
-          })
-          console.error("Error deleting post:", error)
-        },
-      })
-    } else {
-      deletePostByUser(
-        { id: postId, userId },
-        {
-          onSuccess: () => {
-            toast({
-              title: "Publicación eliminada",
-              description: "La publicación ha sido eliminada exitosamente.",
-            })
-          },
-          onError: (error) => {
-            toast({
-              title: "Error",
-              description: "No se pudo eliminar la publicación.",
-              variant: "destructive",
-            })
-            console.error("Error deleting post:", error)
-          },
-        }
-      )
-    }
+    const mutation = isAdmin
+      ? deletePostByAdmin.bind(null, postId)
+      : deletePostByUser.bind(null, { id: postId, userId })
+
+    mutation({
+      onSuccess: () =>
+        toast({
+          title: "Publicación eliminada",
+          description: "La publicación fue eliminada exitosamente.",
+        }),
+      onError: (error: any) => {
+        console.error("Error deleting post:", error)
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar la publicación.",
+          variant: "destructive",
+        })
+      },
+    })
   }
 
   const openEditDialog = (post: DisplayPost) => {
     setEditingPost(post)
-    setFormData({ title: post.title, content: post.content })
+    setFormData({ title: post.title, content: post.content, images: post.images || [] })
   }
 
   const canEditPost = (post: DisplayPost) =>
@@ -223,7 +242,9 @@ export default function PostsPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Publicaciones</h1>
-            <p className="text-gray-600 mt-2">Comparte y descubre iniciativas ambientales de la comunidad</p>
+            <p className="text-gray-600 mt-2">
+              Comparte y descubre iniciativas ambientales de la comunidad
+            </p>
           </div>
 
           {isAuthenticated && (
@@ -237,8 +258,11 @@ export default function PostsPage() {
               <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                   <DialogTitle>Crear Nueva Publicación</DialogTitle>
-                  <DialogDescription>Comparte tu experiencia o iniciativa ambiental con la comunidad</DialogDescription>
+                  <DialogDescription>
+                    Comparte tu experiencia o iniciativa ambiental
+                  </DialogDescription>
                 </DialogHeader>
+
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium">Título</label>
@@ -253,18 +277,37 @@ export default function PostsPage() {
                     <label className="text-sm font-medium">Contenido</label>
                     <Textarea
                       value={formData.content}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))}
-                      placeholder="Describe tu iniciativa, experiencia o proyecto ambiental..."
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, content: e.target.value }))
+                      }
+                      placeholder="Describe tu iniciativa o proyecto ambiental..."
                       rows={6}
                       disabled={isCreating}
                     />
                   </div>
+
+                  <div>
+                    <label className="text-sm font-medium">Imagen (opcional)</label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <Input type="file" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
+                      {isUploading && <Loader2 className="h-5 w-5 animate-spin text-gray-500" />}
+                      <ImageIcon className="h-5 w-5 text-gray-400" />
+                    </div>
+                    {formData.images.length > 0 && (
+                      <img
+                        src={formData.images[0]}
+                        alt="Vista previa"
+                        className="w-full h-40 object-cover rounded-md mt-3"
+                      />
+                    )}
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="outline"
                       onClick={() => {
                         setIsCreateDialogOpen(false)
-                        setFormData({ title: "", content: "" })
+                        setFormData({ title: "", content: "", images: [] })
                       }}
                       disabled={isCreating}
                     >
@@ -273,8 +316,7 @@ export default function PostsPage() {
                     <Button onClick={handleCreatePost} disabled={isCreating}>
                       {isCreating ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Publicando...
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publicando...
                         </>
                       ) : (
                         "Publicar"
@@ -287,7 +329,7 @@ export default function PostsPage() {
           )}
         </div>
 
-        {/* Search */}
+        {/* Filtro de búsqueda */}
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -298,197 +340,76 @@ export default function PostsPage() {
           />
         </div>
 
-        {/* Login prompt for non-authenticated users */}
-        {!isAuthenticated && (
-          <Card className="mb-6 bg-green-50 border-green-200">
-            <CardContent className="p-6">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-green-800 mb-2">¡Únete a la Comunidad!</h3>
-                <p className="text-green-700 mb-4">
-                  Regístrate para crear tus propias publicaciones y participar en la conversación ambiental.
-                </p>
-                <div className="flex justify-center gap-3">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white bg-transparent"
-                  >
-                    <Link href="/auth/login">Iniciar Sesión</Link>
-                  </Button>
-                  <Button asChild className="bg-green-600 hover:bg-green-700">
-                    <Link href="/auth/register">Registrarse</Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <p className="ml-3 text-gray-500">Cargando publicaciones...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <Card className="bg-red-50 border-red-200">
-            <CardContent className="p-6 text-center">
-              <p className="text-red-600">Error al cargar las publicaciones. Por favor, intenta de nuevo.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Posts Grid */}
+        {/* Listado de posts */}
         {!isLoading && !error && (
           <div className="grid gap-6">
-            {filteredPosts.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <p className="text-gray-500">
-                    {searchTerm
-                      ? "No se encontraron publicaciones que coincidan con tu búsqueda."
-                      : "No hay publicaciones aún. ¡Sé el primero en compartir!"}
-                  </p>
+            {filteredPosts.map((post) => (
+              <Card key={post.id} className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle>{post.title}</CardTitle>
+                      <div className="text-sm text-gray-500 flex items-center gap-2">
+                        <User className="h-4 w-4" /> {post.authorName} •{" "}
+                        <Calendar className="h-4 w-4" />{" "}
+                        {new Date(post.postDate ?? "").toLocaleDateString() || "Fecha no disponible"}
+                      </div>
+                    </div>
+                    {canEditPost(post) && (
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(post)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeletePost(post)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+
+                {post.images && post.images.length > 0 && (
+                  <div className="px-6">
+                    <img
+                      src={post.images[0]}
+                      alt={post.title}
+                      className="w-full h-48 object-cover rounded-md mb-4"
+                    />
+                  </div>
+                )}
+
+                <CardContent>
+                  <p className="text-gray-700">{post.content}</p>
                 </CardContent>
               </Card>
-            ) : (
-              filteredPosts.map((post) => (
-                <Card key={post.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <CardTitle className="text-xl mb-2">{post.title}</CardTitle>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            {post.authorName}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {(() => {
-                              const d = post.postDate ? new Date(post.postDate) : null
-                              return d && !isNaN(d.getTime()) ? d.toLocaleDateString("es-ES") : "—"
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-
-                      {canEditPost(post) && (
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(post)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. La publicación será eliminada permanentemente.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeletePost(post)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  {post.images && post.images.length > 0 && (
-                    <div className="px-6">
-                      <img
-                        src={post.images[0] || "/placeholder.svg"}
-                        alt={post.title}
-                        className="w-full h-48 object-cover rounded-lg mb-4"
-                      />
-                    </div>
-                  )}
-                  <CardContent className="pt-0">
-                    <p className="text-gray-700 leading-relaxed">{post.content}</p>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+            ))}
           </div>
         )}
-
-        {/* Edit Dialog */}
-        <Dialog
-          open={!!editingPost}
-          onOpenChange={() => {
-            setEditingPost(null)
-            setFormData({ title: "", content: "" })
-          }}
-        >
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Editar Publicación</DialogTitle>
-              <DialogDescription>Actualiza el contenido de tu publicación</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Título</label>
-                <Input
-                  value={formData.title}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="Título de tu publicación"
-                  disabled={isUpdating}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Contenido</label>
-                <Textarea
-                  value={formData.content}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))}
-                  placeholder="Describe tu iniciativa, experiencia o proyecto ambiental..."
-                  rows={6}
-                  disabled={isUpdating}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditingPost(null)
-                    setFormData({ title: "", content: "" })
-                  }}
-                  disabled={isUpdating}
-                >
-                  Cancelar
-                </Button>
-                <Button onClick={handleEditPost} disabled={isUpdating}>
-                  {isUpdating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    "Guardar Cambios"
-                  )}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   )
