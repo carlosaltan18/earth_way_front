@@ -21,7 +21,7 @@ export type DisplayPost = {
   id: string;
   title: string;
   content: string;
-  postDate?: string;
+  postDate: string;
   authorId: string;
   authorName: string;
   images: string[];
