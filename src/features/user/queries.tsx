@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "./api";
-import type { UserType as User, GetUsersParams, ChangePasswordPayload, PaginatedUsersResponse } from "./types";
+import type {
+  UserType as User,
+  GetUsersParams,
+  ChangePasswordPayload,
+  PaginatedUsersResponse,
+  UserForCombobox,
+} from "./types";
 
 export const userKeys = {
   all: ["users"] as const,
@@ -8,6 +14,7 @@ export const userKeys = {
   list: (params?: GetUsersParams) => [...userKeys.lists(), params] as const,
   details: () => [...userKeys.all, "detail"] as const,
   detail: (id: number) => [...userKeys.details(), id] as const,
+  comboboxList: () => [...userKeys.lists(), "comboboxList"] as const,
 };
 
 // Queries
@@ -53,7 +60,8 @@ export const useUpdateUserById = () => {
 
 export const useChangePassword = () => {
   return useMutation({
-    mutationFn: (payload: ChangePasswordPayload) => userApi.changePassword(payload),
+    mutationFn: (payload: ChangePasswordPayload) =>
+      userApi.changePassword(payload),
   });
 };
 
@@ -65,5 +73,13 @@ export const useDeleteCurrentUser = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: userKeys.all });
     },
+  });
+};
+
+export const useGetUsersForCombobox = () => {
+  return useQuery<UserForCombobox[], Error>({
+    queryKey: userKeys.comboboxList(),
+    queryFn: userApi.getUsersForCombobox,
+    staleTime: 1000 * 60 * 5,
   });
 };

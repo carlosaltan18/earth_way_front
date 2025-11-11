@@ -1,8 +1,18 @@
 import { api, ApiError } from "@/lib/api";
-import type { UserType as User, GetUsersParams, ChangePasswordPayload, PaginatedUsersResponse } from "./types";
+import { isAxiosError } from "axios";
+import type {
+  UserType as User,
+  GetUsersParams,
+  ChangePasswordPayload,
+  PaginatedUsersResponse,
+  UserForCombobox,
+  GetUsersForComboboxResponse,
+} from "./types";
 
 export const userApi = {
-  getUsers: async (params?: GetUsersParams): Promise<PaginatedUsersResponse> => {
+  getUsers: async (
+    params?: GetUsersParams
+  ): Promise<PaginatedUsersResponse> => {
     try {
       const response = await api.get("/user/get-user", { params });
       return response.data;
@@ -29,7 +39,10 @@ export const userApi = {
     }
   },
 
-  updateUserById: async (idUser: number, user: Partial<User>): Promise<User> => {
+  updateUserById: async (
+    idUser: number,
+    user: Partial<User>
+  ): Promise<User> => {
     try {
       const response = await api.put(`/user/update/${idUser}`, user);
       return response.data;
@@ -54,4 +67,19 @@ export const userApi = {
     }
   },
 
+  // Obtener la lista de usuarios con rol organization para el combobox de creator_id
+  getUsersForCombobox: async (): Promise<UserForCombobox[]> => {
+    try {
+      const response = await api.get<GetUsersForComboboxResponse>(
+        "/user/userorganization"
+      );
+
+      return response.data.data;
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 404) {
+        return [];
+      }
+      throw ApiError.fromAxiosError(err);
+    }
+  },
 };
