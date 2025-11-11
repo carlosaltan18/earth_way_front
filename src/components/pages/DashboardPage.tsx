@@ -28,7 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {Event as EventType} from "@/features/event/types"
+import type { Event as EventType } from "@/features/event/types"
 import { useCreateEvent, useGetEvents, useDeleteEvent, useUpdateEvent } from "@/features/event/queries"
 
 import {
@@ -535,7 +535,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
 
   // Form states
   const [userForm, setUserForm] = useState({ name: "", email: "", phone: "", password: "" });
-  const [eventForm, setEventForm] = useState({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" as DashboardEvent["category"] | "" });
+  const [eventForm, setEventForm] = useState({ name: "", description: "", date: "", location: null as { lat: number; lng: number } | string | null, maxParticipants: "", category: "" as DashboardEvent["category"] | "" });
   const [orgForm, setOrgForm] = useState({ name: "", description: "", contactEmail: "", contactPhone: "", creatorId: null as number | null, logo: "", editing: false });
   const [reportForm, setReportForm] = useState({ title: "", description: "", location: null as { lat: number; lng: number } | null, editing: false });
 
@@ -578,23 +578,34 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
       });
       return;
     }
-    const newEvent: DashboardEvent = {
-      id: Date.now().toString(),
+
+    const loc = eventForm.location as { lat: number; lng: number } | string | null;
+    const payloadCreate: Omit<EventType, "id"> = {
       name: eventForm.name,
       description: eventForm.description,
+      direction: typeof loc === "string" ? loc : loc ? `${loc.lat.toFixed(6)},${loc.lng.toFixed(6)}` : "",
       date: eventForm.date,
-      location: eventForm.location,
-      organizationId: user?.organizationId || "1",
-      organizationName: user?.name || "Organización",
-      participants: 0,
-      maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined,
-      category: eventForm.category as DashboardEvent["category"],
+      idOrganization: user?.organizationId ? Number(user.organizationId) : undefined,
       finished: false,
+      latitude: typeof loc === "object" && loc ? loc.lat : undefined,
+      longitude: typeof loc === "object" && loc ? loc.lng : undefined,
     };
-    setEvents((prev) => [newEvent, ...prev]);
-    setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" });
-    setIsEventDialogOpen(false);
-    toast({ title: "Evento creado", description: "El evento ha sido creado exitosamente." });
+
+    createEvent(
+      payloadCreate,
+      {
+        onSuccess: () => {
+          toast({ title: "Evento creado", description: "El evento ha sido creado exitosamente." });
+          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "" });
+          setIsEventDialogOpen(false);
+          try { refetchEvents?.(); } catch (e) { /* ignore */ }
+        },
+        onError: (error: any) => {
+          toast({ title: "Error", description: `No se pudo crear el evento: ${error?.message || "Error desconocido"}`, variant: "destructive" });
+          console.error("createEvent error:", error);
+        },
+      }
+    );
   };
 
   const handleEditEvent = () => {
@@ -606,20 +617,54 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
       });
       return;
     }
-    setEvents((prev) => prev.map((ev) => ev.id === editingEvent!.id ? { ...ev, name: eventForm.name, description: eventForm.description, date: eventForm.date, location: eventForm.location, maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined, category: eventForm.category as DashboardEvent["category"] } : ev ));
-    setEditingEvent(null);
-    setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" });
-    toast({ title: "Evento actualizado", description: "Los cambios han sido guardados exitosamente." });
+
+    const locUp = eventForm.location as { lat: number; lng: number } | string | null;
+    const payloadUpdate: { idEvent: number; event: Omit<EventType, "id"> } = {
+      idEvent: Number(editingEvent.id),
+      event: {
+        name: eventForm.name,
+        description: eventForm.description,
+        direction: typeof locUp === "string" ? locUp : locUp ? `${locUp.lat.toFixed(6)},${locUp.lng.toFixed(6)}` : "",
+        date: eventForm.date,
+        idOrganization: user?.organizationId ? Number(user.organizationId) : undefined,
+        finished: editingEvent.finished,
+        latitude: typeof locUp === "object" && locUp ? locUp.lat : undefined,
+        longitude: typeof locUp === "object" && locUp ? locUp.lng : undefined,
+      },
+    };
+
+    updateEvent(payloadUpdate,
+      {
+        onSuccess: () => {
+          toast({ title: "Evento actualizado", description: "Los cambios han sido guardados exitosamente." });
+          setEditingEvent(null);
+          setEventForm({ name: "", description: "", date: "", location: null, maxParticipants: "", category: "" });
+          try { refetchEvents?.(); } catch (e) { /* ignore */ }
+        },
+        onError: (error: any) => {
+          toast({ title: "Error", description: `No se pudo actualizar el evento: ${error?.message || "Error desconocido"}`, variant: "destructive" });
+          console.error("updateEvent error:", error);
+        },
+      }
+    );
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== eventId));
-    toast({ title: "Evento eliminado", description: "El evento ha sido eliminado del sistema." });
+    deleteEvent(Number(eventId), {
+      onSuccess: () => {
+        toast({ title: "Evento eliminado", description: "El evento ha sido eliminado del sistema." });
+        try { refetchEvents?.(); } catch (e) { /* ignore */ }
+      },
+      onError: (error: any) => {
+        toast({ title: "Error", description: `No se pudo eliminar el evento: ${error?.message || "Error desconocido"}`, variant: "destructive" });
+        console.error("deleteEvent error:", error);
+      },
+    });
   };
 
   const openEditEventDialog = (event: DashboardEvent) => {
     setEditingEvent(event);
-    setEventForm({ name: event.name, description: event.description, date: event.date, location: event.location, maxParticipants: event.maxParticipants?.toString() || "", category: event.category });
+  setEventForm({ name: event.name, description: event.description, date: event.date, location: null, maxParticipants: event.maxParticipants?.toString() || "", category: event.category });
   };
 
   // Posts
@@ -628,7 +673,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
     toast({ title: "Publicación eliminada", description: "La publicación ha sido eliminada del sistema." });
   };
 
-  // Organizations CRUD (usa tus mutations)
+  // Organizations CRUD 
   const handleCreateOrganization = () => {
     if (!orgForm.name.trim() || !orgForm.description.trim() || !orgForm.contactEmail.trim() || !orgForm.contactPhone.trim() || !orgForm.creatorId) {
       toast({ title: "Error", description: "Por favor completa todos los campos obligatorios.", variant: "destructive" });
@@ -842,6 +887,15 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                 openEditEventDialog={openEditEventDialog}
                 setIsEventDialogOpen={setIsEventDialogOpen}
                 handleDeleteEvent={handleDeleteEvent}
+                isEventDialogOpen={isEventDialogOpen}
+                eventForm={eventForm}
+                setEventForm={setEventForm}
+                handleCreateEvent={handleCreateEvent}
+                handleEditEvent={handleEditEvent}
+                isCreatingEvent={isCreatingEvent}
+                isUpdatingEvent={isUpdatingEvent}
+                isDeletingEvent={isDeletingEvent}
+                editingEvent={editingEvent}
                 hasRole={hasRole}
                 categoryLabels={categoryLabels}
               />
