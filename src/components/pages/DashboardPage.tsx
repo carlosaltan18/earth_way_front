@@ -1,9 +1,11 @@
 "use client"
 
 import type { UserType, PaginatedUsersResponse } from "@/features/user/types"
+import {Event as EventType} from "@/features/event/types"
 import { useAddRoleToUser, useRemoveRoleFromUser, useGetRoles } from "@/features/role/queries"
 import { useGetUsers } from "@/features/user/queries"
 import { useCreateReport, useGetReports, useDeleteReport, usePatchReport, useUpdateReport } from "@/features/report/queries"
+import { useCreateEvent, useGetEvents, useDeleteEvent, useUpdateEvent } from "@/features/event/queries"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import Layout from "@/components/layout/Layout"
@@ -297,6 +299,14 @@ export default function DashboardPage() {
     refetch: refetchReports
   } = useGetReports()
 
+  const{
+    data: eventsData,
+    isLoading: isLoadingEvents,
+    error: eventsError,
+    refetch: refetchEvents
+  } = useGetEvents()
+
+
   // Get available roles
 const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
   const { mutate: addRole, isPending: isAddingRole } = useAddRoleToUser()
@@ -305,6 +315,11 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
   const { mutate: deleteReport, isPending: isDeletingReport } = useDeleteReport()
   const { mutate: patchReport, isPending: isPatchingReport } = usePatchReport()
   const { mutate: updateReport, isPending: isUpdatingReport } = useUpdateReport()
+
+  //Event mutations
+  const { mutate: createEvent, isPending: isCreatingEvent} = useCreateEvent()
+  const { mutate: deleteEvent, isPending: isDeletingEvent} = useDeleteEvent()
+  const { mutate: updateEvent, isPending: isUpdatingEvent} = useUpdateEvent()
 
 
 
@@ -361,6 +376,26 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
       setReports(mappedReports)
     }
   }, [reportsData])
+
+  //Listar Events desde la API
+  useEffect(() => {
+  if (eventsData?.payload && Array.isArray(eventsData.payload)) {
+    const mappedEvents: DashboardEvent[] = eventsData.payload.map((event: EventType) => ({
+      id: event.id.toString(),
+      name: event.name,
+      description: event.description,
+      date: event.date || new Date().toISOString(),
+      location: event.direction || '',
+      organizationId: event.idOrganization?.toString() || "",
+      organizationName: "Organización", 
+      participants: 0,
+      category: "reforestation", 
+      finished: event.finished || false
+    }));
+
+    setEvents(mappedEvents);
+  }
+}, [eventsData]);
 
   // Manejo de errores
   useEffect(() => {
@@ -582,93 +617,107 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
 
   // CRUD Functions for Events
   const handleCreateEvent = () => {
-    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date || !eventForm.category) {
+    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos obligatorios.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    const newEvent: DashboardEvent = {
-      id: Date.now().toString(),
-      name: eventForm.name,
-      description: eventForm.description,
-      date: eventForm.date,
-      location: eventForm.location,
-      organizationId: user?.organizationId || "1",
-      organizationName: user?.name || "Organización",
-      participants: 0,
-      maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined,
-      category: eventForm.category as DashboardEvent["category"],
-      finished: false,
-    }
-
-    setEvents((prev) => [newEvent, ...prev])
-    setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" })
-    setIsEventDialogOpen(false)
-
-    toast({
-      title: "Evento creado",
-      description: "El evento ha sido creado exitosamente.",
-    })
-  }
+    createEvent(
+      {
+        name: eventForm.name,
+        description: eventForm.description,
+        direction: eventForm.location,
+        date: eventForm.date,
+        latitude: 0, // Agregar si es necesario
+        longitude: 0, // Agregar si es necesario
+        idOrganization: user?.organizationId ? Number(user.organizationId) : undefined
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Evento creado",
+            description: "El evento ha sido creado exitosamente."
+          });
+          setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" });
+          setIsEventDialogOpen(false);
+          refetchEvents();
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Error",
+            description: `No se pudo crear el evento: ${error.message || "Error desconocido"}`,
+            variant: "destructive"
+          });
+        }
+      }
+    );
+  };
 
   const handleEditEvent = () => {
-    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date || !eventForm.category) {
+    if (!eventForm.name.trim() || !eventForm.description.trim() || !eventForm.date || !editingEvent) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos obligatorios.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id === editingEvent!.id
-          ? {
-            ...event,
-            name: eventForm.name,
-            description: eventForm.description,
-            date: eventForm.date,
-            location: eventForm.location,
-            maxParticipants: eventForm.maxParticipants ? Number.parseInt(eventForm.maxParticipants) : undefined,
-            category: eventForm.category as DashboardEvent["category"],
-          }
-          : event,
-      ),
-    )
-
-    setEditingEvent(null)
-    setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" })
-
-    toast({
-      title: "Evento actualizado",
-      description: "Los cambios han sido guardados exitosamente.",
-    })
-  }
+    updateEvent(
+      {
+        idEvent: Number(editingEvent.id),
+        event: {
+          name: eventForm.name,
+          description: eventForm.description,
+          direction: eventForm.location,
+          date: eventForm.date,
+          idOrganization: user?.organizationId ? Number(user.organizationId) : undefined
+        }
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Evento actualizado",
+            description: "Los cambios han sido guardados exitosamente."
+          });
+          setEventForm({ name: "", description: "", date: "", location: "", maxParticipants: "", category: "" });
+          setEditingEvent(null);
+          setIsEventDialogOpen(false);
+          refetchEvents();
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Error",
+            description: `No se pudo actualizar el evento: ${error.message || "Error desconocido"}`,
+            variant: "destructive"
+          });
+        }
+      }
+    );
+  };
 
   const handleDeleteEvent = (eventId: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== eventId))
-    toast({
-      title: "Evento eliminado",
-      description: "El evento ha sido eliminado del sistema.",
-    })
-  }
-
-  const openEditEventDialog = (event: DashboardEvent) => {
-    setEditingEvent(event)
-    setEventForm({
-      name: event.name,
-      description: event.description,
-      date: event.date,
-      location: event.location,
-      maxParticipants: event.maxParticipants?.toString() || "",
-      category: event.category,
-    })
-  }
+    deleteEvent(Number(eventId), {
+      onSuccess: () => {
+        toast({
+          title: "Evento eliminado",
+          description: "El evento ha sido eliminado del sistema."
+        });
+        refetchEvents();
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Error",
+          description: `No se pudo eliminar el evento: ${error.message || "Error desconocido"}`,
+          variant: "destructive"
+        });
+      }
+    });
+  };
 
   // CRUD Functions for Posts
   const handleDeletePost = (postId: string) => {
@@ -1272,7 +1321,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => {
-                                    openEditEventDialog(event)
+                                    //openEditEventDialog(event)
                                     setIsEventDialogOpen(true)
                                   }}
                                 >
