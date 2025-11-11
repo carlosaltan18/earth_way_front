@@ -71,7 +71,7 @@ export const userApi = {
   getUsersForCombobox: async (): Promise<UserForCombobox[]> => {
     try {
       const response = await api.get<GetUsersForComboboxResponse>(
-        "/api/v1/user/userorganization"
+        "/user/userorganization"
       );
 
       return response.data.data;
