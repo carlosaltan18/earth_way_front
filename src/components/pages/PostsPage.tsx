@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Edit, Trash2, Search, Calendar, User, Loader2, Image as ImageIcon } from "lucide-react"
-import Link from "next/link"
 import {
   useListPosts,
   useCreatePost,
@@ -37,7 +36,7 @@ import {
   useDeletePostByAdmin,
 } from "@/features/post/queries"
 import type { Post as PostType, DisplayPost } from "@/features/post/types"
-import { api } from "@/lib/apiUpload" // usamos tu apiUpload.ts
+import { api } from "@/lib/apiUpload"
 
 export default function PostsPage() {
   const { user, isAuthenticated } = useAuth()
@@ -61,7 +60,7 @@ export default function PostsPage() {
   const { mutate: deletePostByUser } = useDeletePostByUser()
   const { mutate: deletePostByAdmin } = useDeletePostByAdmin()
 
-  // Transformar datos de la API
+  // Transformar datos
   const posts: DisplayPost[] = useMemo(() => {
     if (!postsData) return []
     return postsData.payload.map((post: PostType): DisplayPost => ({
@@ -70,6 +69,7 @@ export default function PostsPage() {
       content: post.content,
       postDate: post.postDate || new Date().toISOString().split("T")[0],
       authorId: post.author?.id?.toString() || post.authorId?.toString() || "",
+      authorEmail: post.author?.email || "",
       authorName: post.author
         ? `${post.author.name} ${post.author.surname}`.trim()
         : "Autor desconocido",
@@ -77,6 +77,7 @@ export default function PostsPage() {
     }))
   }, [postsData])
 
+  // Filtrar por búsqueda
   const filteredPosts = posts.filter(
     (post) =>
       post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -84,37 +85,31 @@ export default function PostsPage() {
       post.authorName.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // 📤 Subida de imagen al servidor
+  // Subir imagen
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-
     setIsUploading(true)
     try {
       const formDataUpload = new FormData()
       formDataUpload.append("file", file)
-
       const response = await api.post("/upload", formDataUpload, {
         headers: { "Content-Type": "multipart/form-data" },
       })
+  const imageUrl = response.data.imageUrl
 
-      const imageUrl = response.data.imageUrl
+      // Si estamos editando un post, reemplazamos la imagen principal (posición 0).
+      // Si no, simplemente añadimos la nueva imagen al final.
       setFormData((prev) => ({
         ...prev,
-        images: [...prev.images, imageUrl],
+        images: editingPost ? [imageUrl, ...prev.images.filter((_, i) => i > 0)] : [...prev.images, imageUrl],
       }))
-
-      toast({
-        title: "Imagen subida",
-        description: "La imagen se subió correctamente.",
-      })
+      // feedback simple
+      toast({ title: "Imagen subida", description: "La imagen se subió correctamente." })
+      toast({ title: "Imagen subida", description: "La imagen se subió correctamente." })
     } catch (error) {
       console.error("Error uploading image:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo subir la imagen.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "No se pudo subir la imagen.", variant: "destructive" })
     } finally {
       setIsUploading(false)
     }
@@ -142,185 +137,138 @@ export default function PostsPage() {
         onSuccess: () => {
           setFormData({ title: "", content: "", images: [] })
           setIsCreateDialogOpen(false)
-          toast({
-            title: "¡Publicación creada!",
-            description: "Tu publicación ha sido creada exitosamente.",
-          })
+          toast({ title: "¡Publicación creada!", description: "Tu publicación ha sido creada." })
         },
         onError: (error) => {
           console.error("Error creating post:", error)
-          toast({
-            title: "Error",
-            description: "No se pudo crear la publicación.",
-            variant: "destructive",
-          })
+          toast({ title: "Error", description: "No se pudo crear la publicación.", variant: "destructive" })
         },
       }
     )
   }
 
-  // Editar post
+  // Editar post (solo autor)
   const handleEditPost = () => {
-    if (!formData.title.trim() || !formData.content.trim() || !editingPost) {
-      toast({
-        title: "Error",
-        description: "Por favor completa todos los campos.",
-        variant: "destructive",
-      })
+    if (!editingPost || !formData.title.trim() || !formData.content.trim()) return
+    // allow editing only if the logged user is the author (compare both email and id)
+    const isAuthor = String(user?.email) === String(editingPost.authorEmail) || String(user?.id) === String(editingPost.authorId)
+    if (!isAuthor) {
+      toast({ title: "Permiso denegado", description: "No puedes editar este post.", variant: "destructive" })
       return
+    }
+
+    const payloadToSend = {
+      id: Number(editingPost.id),
+      userId: Number(editingPost.authorId),
+      post: {
+        title: formData.title,
+        content: formData.content,
+        postDate: editingPost.postDate,
+        images: formData.images,
+      },
     }
 
     updatePost(
       {
-        id: Number(editingPost.id),
-        userId: Number(user?.id),
-        post: {
-          title: formData.title,
-          content: formData.content,
-          postDate: editingPost.postDate,
-          images: formData.images,
-        },
+        ...payloadToSend,
       },
       {
         onSuccess: () => {
           setEditingPost(null)
           setFormData({ title: "", content: "", images: [] })
-          toast({
-            title: "¡Publicación actualizada!",
-            description: "Los cambios se guardaron exitosamente.",
-          })
+          toast({ title: "¡Publicación actualizada!", description: "Cambios guardados correctamente." })
         },
         onError: (error) => {
           console.error("Error updating post:", error)
-          toast({
-            title: "Error",
-            description: "No se pudo actualizar la publicación.",
-            variant: "destructive",
-          })
+          toast({ title: "Error", description: "No se pudo actualizar la publicación.", variant: "destructive" })
         },
       }
     )
   }
 
+  // Eliminar post (autor o admin)
   const handleDeletePost = (post: DisplayPost) => {
-    const isAdmin = user?.roles?.includes("ROLE_ADMIN")
     const postId = Number(post.id)
-    const userId = Number(user?.id)
+    const isAdminUser = user?.roles?.includes("ROLE_ADMIN")
+    const isAuthor = String(user?.email) === String(post.authorEmail) || String(user?.id) === String(post.authorId)
 
-    const mutation = isAdmin
-      ? deletePostByAdmin.bind(null, postId)
-      : deletePostByUser.bind(null, { id: postId, userId })
+    if (!isAdminUser && !isAuthor) {
+      toast({ title: "Permiso denegado", description: "No puedes eliminar este post.", variant: "destructive" })
+      return
+    }
 
-    mutation({
-      onSuccess: () =>
-        toast({
-          title: "Publicación eliminada",
-          description: "La publicación fue eliminada exitosamente.",
-        }),
-      onError: (error: any) => {
-        console.error("Error deleting post:", error)
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar la publicación.",
-          variant: "destructive",
-        })
-      },
-    })
+    if (isAdminUser) {
+      deletePostByAdmin(postId, {
+        onSuccess: () => {
+          toast({ title: "Publicación eliminada", description: "Se eliminó correctamente." })
+        },
+        onError: (error: any) => {
+          console.error("Error deleting post:", error)
+          toast({ title: "Error", description: "No se pudo eliminar la publicación.", variant: "destructive" })
+        },
+      })
+    } else {
+      // pass the numeric authorId (post.authorId) as userId so backend receives a valid numeric id
+      deletePostByUser({ id: postId, userId: Number(post.authorId) }, {
+        onSuccess: () => {
+          toast({ title: "Publicación eliminada", description: "Se eliminó correctamente." })
+        },
+        onError: (error: any) => {
+          console.error("Error deleting post:", error)
+          toast({ title: "Error", description: "No se pudo eliminar la publicación.", variant: "destructive" })
+        },
+      })
+    }
   }
 
   const openEditDialog = (post: DisplayPost) => {
+    // allow editing only if the logged user is the author (compare both email and id)
+    const isAuthor = String(user?.email) === String(post.authorEmail) || String(user?.id) === String(post.authorId)
+    if (!isAuthor) {
+      toast({ title: "Acceso denegado", description: "No puedes editar este post.", variant: "destructive" })
+      return
+    }
     setEditingPost(post)
     setFormData({ title: post.title, content: post.content, images: post.images || [] })
   }
 
-  const canEditPost = (post: DisplayPost) =>
-    isAuthenticated && (user?.id === post.authorId || (user?.roles ?? []).includes("ROLE_ADMIN"))
+  const isAdmin = user?.roles?.includes("ROLE_ADMIN")
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Publicaciones</h1>
-            <p className="text-gray-600 mt-2">
-              Comparte y descubre iniciativas ambientales de la comunidad
-            </p>
-          </div>
-
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Publicaciones</h1>
           {isAuthenticated && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Nueva Publicación
+                  <Plus className="h-4 w-4" /> Nueva Publicación
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
+              <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Crear Nueva Publicación</DialogTitle>
-                  <DialogDescription>
-                    Comparte tu experiencia o iniciativa ambiental
-                  </DialogDescription>
+                  <DialogTitle>Crear Publicación</DialogTitle>
+                  <DialogDescription>Comparte tu proyecto ambiental</DialogDescription>
                 </DialogHeader>
-
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Título</label>
-                    <Input
-                      value={formData.title}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                      placeholder="Título de tu publicación"
-                      disabled={isCreating}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Contenido</label>
-                    <Textarea
-                      value={formData.content}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, content: e.target.value }))
-                      }
-                      placeholder="Describe tu iniciativa o proyecto ambiental..."
-                      rows={6}
-                      disabled={isCreating}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">Imagen (opcional)</label>
-                    <div className="flex items-center gap-3 mt-1">
-                      <Input type="file" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
-                      {isUploading && <Loader2 className="h-5 w-5 animate-spin text-gray-500" />}
-                      <ImageIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    {formData.images.length > 0 && (
-                      <img
-                        src={formData.images[0]}
-                        alt="Vista previa"
-                        className="w-full h-40 object-cover rounded-md mt-3"
-                      />
-                    )}
-                  </div>
-
+                  <Input
+                    placeholder="Título"
+                    value={formData.title}
+                    onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
+                  />
+                  <Textarea
+                    placeholder="Contenido..."
+                    rows={5}
+                    value={formData.content}
+                    onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
+                  />
+                  <Input type="file" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
                   <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsCreateDialogOpen(false)
-                        setFormData({ title: "", content: "", images: [] })
-                      }}
-                      disabled={isCreating}
-                    >
-                      Cancelar
-                    </Button>
+                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancelar</Button>
                     <Button onClick={handleCreatePost} disabled={isCreating}>
-                      {isCreating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publicando...
-                        </>
-                      ) : (
-                        "Publicar"
-                      )}
+                      {isCreating ? <Loader2 className="animate-spin h-4 w-4" /> : "Publicar"}
                     </Button>
                   </div>
                 </div>
@@ -329,9 +277,67 @@ export default function PostsPage() {
           )}
         </div>
 
-        {/* Filtro de búsqueda */}
+        {/* Dialog de Edición */}
+        {isAuthenticated && (
+          <Dialog open={!!editingPost} onOpenChange={(open) => {
+            if (!open) {
+              setEditingPost(null)
+              setFormData({ title: "", content: "", images: [] })
+            }
+          }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Publicación</DialogTitle>
+                <DialogDescription>Modifica el contenido de tu publicación</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Título"
+                  value={formData.title}
+                  onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
+                  disabled={isUpdating}
+                />
+                <Textarea
+                  placeholder="Contenido..."
+                  rows={5}
+                  value={formData.content}
+                  onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
+                  disabled={isUpdating}
+                />
+                <div>
+                  <label className="text-sm font-medium">Imagen (opcional)</label>
+                  <Input type="file" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
+                </div>
+                {formData.images.length > 0 && (
+                  <img
+                    src={formData.images[0]}
+                    alt="Vista previa"
+                    className="w-full h-40 object-cover rounded-md"
+                  />
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditingPost(null)
+                      setFormData({ title: "", content: "", images: [] })
+                    }}
+                    disabled={isUpdating}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleEditPost} disabled={isUpdating}>
+                    {isUpdating ? <Loader2 className="animate-spin h-4 w-4" /> : "Guardar"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Buscador */}
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             placeholder="Buscar publicaciones..."
             value={searchTerm}
@@ -340,74 +346,69 @@ export default function PostsPage() {
           />
         </div>
 
-        {/* Listado de posts */}
+        {/* Posts */}
         {!isLoading && !error && (
           <div className="grid gap-6">
-            {filteredPosts.map((post) => (
-              <Card key={post.id} className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle>{post.title}</CardTitle>
-                      <div className="text-sm text-gray-500 flex items-center gap-2">
-                        <User className="h-4 w-4" /> {post.authorName} •{" "}
-                        <Calendar className="h-4 w-4" />{" "}
-                        {new Date(post.postDate ?? "").toLocaleDateString() || "Fecha no disponible"}
-                      </div>
+            {filteredPosts.map((post) => {
+              const isAuthor = String(user?.email) === String(post.authorEmail) || String(user?.id) === String(post.authorId)
+              return (
+              <Card key={post.id}>
+                <div className="p-6 flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">{post.title}</h3>
+                    <div className="text-sm text-gray-500 flex gap-2 items-center mt-2">
+                      <User className="h-4 w-4" /> {post.authorName} •{" "}
+                      <Calendar className="h-4 w-4" /> {new Date(post.postDate ?? "").toLocaleDateString()}
                     </div>
-                    {canEditPost(post) && (
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(post)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700"
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    {isAuthor && (
+                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(post)} title="Editar">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {(isAdmin || isAuthor) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" title="Eliminar">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
+                            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeletePost(post)}
+                              className="bg-red-600 hover:bg-red-700"
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Eliminar publicación?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción no se puede deshacer.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeletePost(post)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                Eliminar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
                   </div>
-                </CardHeader>
+                </div>
 
-                {post.images && post.images.length > 0 && (
-                  <div className="px-6">
+                {post.images?.length > 0 && (
+                  <div className="px-6 pb-4">
                     <img
                       src={post.images[0]}
                       alt={post.title}
-                      className="w-full h-48 object-cover rounded-md mb-4"
+                      className="w-full h-48 object-cover rounded-md"
                     />
                   </div>
                 )}
 
-                <CardContent>
+                <div className="px-6 pb-6">
                   <p className="text-gray-700">{post.content}</p>
-                </CardContent>
+                </div>
               </Card>
-            ))}
+            )})}
           </div>
         )}
       </div>
