@@ -235,22 +235,6 @@ export default function MapPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Categoría</label>
-                  <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="reforestation">Reforestación</SelectItem>
-                      <SelectItem value="cleanup">Limpieza</SelectItem>
-                      <SelectItem value="education">Educación</SelectItem>
-                      <SelectItem value="conservation">Conservación</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardContent>
             </Card>
 
