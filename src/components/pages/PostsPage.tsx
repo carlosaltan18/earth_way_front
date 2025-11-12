@@ -96,8 +96,16 @@ export default function PostsPage() {
       const response = await api.post("/upload", formDataUpload, {
         headers: { "Content-Type": "multipart/form-data" },
       })
-      const imageUrl = response.data.imageUrl
-      setFormData((prev) => ({ ...prev, images: [...prev.images, imageUrl] }))
+  const imageUrl = response.data.imageUrl
+
+      // Si estamos editando un post, reemplazamos la imagen principal (posición 0).
+      // Si no, simplemente añadimos la nueva imagen al final.
+      setFormData((prev) => ({
+        ...prev,
+        images: editingPost ? [imageUrl, ...prev.images.filter((_, i) => i > 0)] : [...prev.images, imageUrl],
+      }))
+      // feedback simple
+      toast({ title: "Imagen subida", description: "La imagen se subió correctamente." })
       toast({ title: "Imagen subida", description: "La imagen se subió correctamente." })
     } catch (error) {
       console.error("Error uploading image:", error)
@@ -149,17 +157,20 @@ export default function PostsPage() {
       return
     }
 
+    const payloadToSend = {
+      id: Number(editingPost.id),
+      userId: Number(editingPost.authorId),
+      post: {
+        title: formData.title,
+        content: formData.content,
+        postDate: editingPost.postDate,
+        images: formData.images,
+      },
+    }
+
     updatePost(
       {
-        id: Number(editingPost.id),
-        // use the numeric authorId from the post (backend expects numeric userId)
-        userId: Number(editingPost.authorId),
-        post: {
-          title: formData.title,
-          content: formData.content,
-          postDate: editingPost.postDate,
-          images: formData.images,
-        },
+        ...payloadToSend,
       },
       {
         onSuccess: () => {
