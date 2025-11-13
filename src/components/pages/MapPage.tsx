@@ -236,7 +236,7 @@ export default function MapPage() {
                   </Select>
                 </div>
 
-                <div>
+                {/* <div>
                   <label className="text-sm font-medium mb-2 block">Categoría</label>
                   <Select value={filterCategory} onValueChange={setFilterCategory}>
                     <SelectTrigger>
@@ -250,7 +250,7 @@ export default function MapPage() {
                       <SelectItem value="conservation">Conservación</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
               </CardContent>
             </Card>
 
