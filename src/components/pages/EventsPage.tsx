@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/layout/Layout";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -37,7 +37,11 @@ import {
   useGetEvents,
   useDeleteEvent,
   useUpdateEvent,
+  useAddParticipant,
+  useDeleteParticipant,
+  useGetParticipants,
 } from "@/features/event/queries";
+import { eventApi } from "@/features/event/api";
 
 import { Textarea } from "@/components/ui/textarea"
 
@@ -86,12 +90,57 @@ export default function EventsPage() {
   const { data: eventsResp, isLoading, isError } = useGetEvents();
   const deleteMutation = useDeleteEvent();
   const updateMutation = useUpdateEvent();
+  const addParticipantMutation = useAddParticipant();
+  const deleteParticipantMutation = useDeleteParticipant();
+  
+  // State to track which events the user is participating in
+  const [userParticipatingEvents, setUserParticipatingEvents] = useState<Set<number>>(new Set());
+
+  // Per-event loading states so only the clicked button shows loading
+  const [joinLoadingId, setJoinLoadingId] = useState<number | null>(null);
+  const [leaveLoadingId, setLeaveLoadingId] = useState<number | null>(null);
+  
+  // Trigger to re-check participation after mutations
+  const [refreshParticipation, setRefreshParticipation] = useState(0);
 
   // normalize list
   const events: ApiEvent[] =
     (eventsResp && ((eventsResp as any).payload || (eventsResp as any).events)) ||
     [];
 
+  // Load participants for each event to check if user is participating
+   useEffect(() => {
+    // Only attempt to check participation when we have an authenticated user id
+    if (!user?.id) return;
+
+    const checkUserParticipation = async () => {
+      const participatingEvents = new Set<number>();
+      
+      for (const event of events) {
+        const eventId = Number(event.id);
+        try {
+          // Use the existing API client to fetch participants (includes auth headers)
+          const participants = await eventApi.getParticipants(eventId);
+
+          if (Array.isArray(participants)) {
+            const isParticipating = participants.some((p: any) => p.userId === Number(user.id) || p.id === Number(user.id));
+            if (isParticipating) {
+              participatingEvents.add(eventId);
+            }
+          }
+        } catch (err) {
+          console.error(`Error loading participants for event ${eventId}:`, err);
+        }
+      }
+      
+      setUserParticipatingEvents(participatingEvents);
+    };
+
+    if (events.length > 0) {
+      checkUserParticipation();
+    }
+  }, [events, user?.id, refreshParticipation]);
+ 
   const filteredEvents = events.filter((event) => {
     const name = (event as any).name || "";
     const description = (event as any).description || "";
@@ -175,6 +224,52 @@ export default function EventsPage() {
     });
   };
 
+  const handleJoinEvent = (eventId: number | string) => {
+    const id = Number(eventId);
+    setJoinLoadingId(id);
+    addParticipantMutation.mutate(id, {
+      onSuccess: () => {
+        toast({ title: "¡Te uniste al evento!", description: "Ya eres participante de este evento." });
+        setUserParticipatingEvents(prev => {
+          const updated = new Set(prev);
+          updated.add(id);
+          return updated;
+        });
+        // Trigger re-check of participation to ensure UI is in sync
+        setRefreshParticipation(prev => prev + 1);
+      },
+      onError: (err: any) => {
+        toast({ title: "Error", description: err?.message || "No se pudo unirse al evento.", variant: "destructive" });
+      },
+      onSettled: () => {
+        setJoinLoadingId(null);
+      }
+    });
+  };
+
+  const handleLeaveEvent = (eventId: number | string) => {
+    const id = Number(eventId);
+    setLeaveLoadingId(id);
+    deleteParticipantMutation.mutate(id, {
+      onSuccess: () => {
+        toast({ title: "Te retiraste del evento", description: "Ya no eres participante de este evento." });
+        setUserParticipatingEvents(prev => {
+          const updated = new Set(prev);
+          updated.delete(id);
+          return updated;
+        });
+        // Trigger re-check of participation to ensure UI is in sync
+        setRefreshParticipation(prev => prev + 1);
+      },
+      onError: (err: any) => {
+        toast({ title: "Error", description: err?.message || "No se pudo retirarse del evento.", variant: "destructive" });
+      },
+      onSettled: () => {
+        setLeaveLoadingId(null);
+      }
+    });
+  };
+
   return (
     <ProtectedRoute>
       <Layout>
@@ -234,7 +329,7 @@ export default function EventsPage() {
             </div>
           </div>
 
-          {canCreateEvent() && (
+          {/* {canCreateEvent() && (
             <Dialog
               open={isCreateEventDialogOpen}
               onOpenChange={setIsCreateEventDialogOpen}
@@ -266,7 +361,7 @@ export default function EventsPage() {
                 )}
               </DialogContent>
             </Dialog>
-          )}
+          )} */}
 
           {/* Events Grid */}
           <div className="grid gap-6">
@@ -326,7 +421,7 @@ export default function EventsPage() {
                       </div>
 
                       <div className="ml-4 flex items-center gap-2">
-                        {canEditEvent(event) && (
+                        {/* {canEditEvent(event) && (
                           <>
                             <Button variant="outline" onClick={() => openEditDialog(event)}>
                               Editar
@@ -335,7 +430,27 @@ export default function EventsPage() {
                               Eliminar
                             </Button>
                           </>
-                        )}
+                        )} */}
+
+                        <>
+                          {userParticipatingEvents.has(Number(event.id)) ? (
+                            <Button
+                              variant="destructive"
+                              onClick={() => handleLeaveEvent(event.id)}
+                              disabled={leaveLoadingId === Number(event.id)}
+                            >
+                              {leaveLoadingId === Number(event.id) ? "Retirándose..." : "Retirarse"}
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => handleJoinEvent(event.id)}
+                              disabled={joinLoadingId === Number(event.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              {joinLoadingId === Number(event.id) ? "Uniéndose..." : "Unirse"}
+                            </Button>
+                          )}
+                        </>
                       </div>
                     </div>
                   </CardHeader>
@@ -349,7 +464,6 @@ export default function EventsPage() {
                     </div>
                   )} */}
                   <CardContent className="pt-0">
-                    {/* El resto del contenido permanece igual */}
                   </CardContent>
                 </Card>
               ))
@@ -405,12 +519,12 @@ export default function EventsPage() {
                     rows={6}
                   />
                 </div>
-                <div className="flex justify-end gap-2">
+                {/* <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setEditingEvent(null)}>
                     Cancelar
                   </Button>
                   <Button onClick={handleEditEvent}>Guardar Cambios</Button>
-                </div>
+                </div> */}
               </div>
             </DialogContent>
           </Dialog>

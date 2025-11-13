@@ -76,7 +76,14 @@ export const eventApi = {
   countParticipants: async (eventId: number): Promise<number> => {
     try {
       const response = await api.get(`/event/${eventId}/participants/count`);
-      return response.data;
+      const d = response.data;
+      // Normalize different possible response shapes coming from the backend
+      if (typeof d === "number") return d;
+      if (d && typeof d.payload !== "undefined") return Number(d.payload);
+      if (d && typeof d.count !== "undefined") return Number(d.count);
+      // Fallback: attempt to coerce to number
+      const coerced = Number(d);
+      return Number.isNaN(coerced) ? 0 : coerced;
     } catch (err) {
       throw ApiError.fromAxiosError(err);
     }

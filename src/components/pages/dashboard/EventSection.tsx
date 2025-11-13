@@ -34,6 +34,7 @@ export default function EventSection({
   isDeletingEvent,
   editingEvent,
   organizations,
+  participantsCounts,
 }: {
   events: any[];
   eventSearch: string;
@@ -54,6 +55,7 @@ export default function EventSection({
   isDeletingEvent: boolean;
   editingEvent: any | null;
   organizations: any[];
+  participantsCounts: Record<number, number>;
 }) {
   return (
     <Card>
@@ -153,10 +155,9 @@ export default function EventSection({
                     <div className="space-y-2 text-xs sm:text-sm text-gray-600">
                       <div className="flex items-center gap-2"><Calendar className="h-4 w-4 flex-shrink-0" />{new Date(event.date).toLocaleDateString("es-ES")}</div>
                       <div className="flex items-center gap-2"><MapPin className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{event.location}</span></div>
-                      <div className="flex items-center gap-2"><Users className="h-4 w-4 flex-shrink-0" />{event.participants} participantes{event.maxParticipants && ` / ${event.maxParticipants}`}</div>
+                      <div className="flex items-center gap-2"><Users className="h-4 w-4 flex-shrink-0" />{participantsCounts[Number(event.id)] ?? 0} participantes{event.maxParticipants && ` / ${event.maxParticipants}`}</div>
                       <div className="flex items-center gap-2"><Building className="h-4 w-4 flex-shrink-0" /><span className="line-clamp-1">{(() => {
                         const org = organizations.find((o) => o.id === event.organizationId);
-                        console.log("Buscando org con id:", event.organizationId, "Orgs disponibles:", organizations.map(o => o.id), "Org encontrada:", org?.name);
                         return org?.name || "Organización no encontrada";
                       })()}</span></div>
                     </div>
