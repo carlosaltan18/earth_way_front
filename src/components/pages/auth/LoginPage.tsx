@@ -97,20 +97,7 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-2">Usuarios de prueba:</p>
-                <div className="text-xs space-y-1">
-                  <div>
-                    <strong>Admin:</strong> admin@earthway.com / admin123
-                  </div>
-                  <div>
-                    <strong>Usuario:</strong> user@earthway.com / user123
-                  </div>
-                  <div>
-                    <strong>Organización:</strong> org@earthway.com / org123
-                  </div>
-                </div>
-              </div>
+            
             </CardContent>
           </Card>
         </div>
