@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Event as EventType } from "@/features/event/types"
-import { useCreateEvent, useGetEvents, useDeleteEvent, useUpdateEvent } from "@/features/event/queries"
+import { useCreateEvent, useGetEvents, useDeleteEvent, useUpdateEvent, useCountParticipants } from "@/features/event/queries"
+import { eventApi } from "@/features/event/api"
 
 import {
   Users,
@@ -277,6 +278,7 @@ const hasRole = (role: string | UserRole): boolean => {
   const [posts, setPosts] = useState<DashboardPost[]>(mockPosts);
   const [organizations, setOrganizations] = useState<DashboardOrganization[]>([]);
   const [reports, setReports] = useState<DashboardReport[]>([]);
+  const [participantsCounts, setParticipantsCounts] = useState<Record<number, number>>({}); // Almacenar conteo por evento
 
   const createOrgMutation = useCreateOrganization();
   const updateOrgMutation = useUpdateOrganization();
@@ -436,6 +438,31 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
     setEvents(mappedEvents);
   }
 }, [eventsData]);
+
+  // Cargar conteo de participantes para cada evento
+  useEffect(() => {
+    const loadParticipantsCounts = async () => {
+      const counts: Record<number, number> = {};
+      
+      for (const event of events) {
+        const eventId = Number(event.id);
+        try {
+          const count = await eventApi.countParticipants(eventId);
+          const n = Number(count);
+          counts[eventId] = Number.isNaN(n) ? 0 : n;
+        } catch (err) {
+          console.error(`Error loading participant count for event ${eventId}:`, err);
+          counts[eventId] = 0;
+        }
+      }
+      
+      setParticipantsCounts(counts);
+    };
+
+    if (events.length > 0) {
+      loadParticipantsCounts();
+    }
+  }, [events]);
 
   // Manejo de errores usuarios y reportes
   useEffect(() => {
@@ -899,6 +926,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
                 organizations={organizations}
                 hasRole={hasRole}
                 categoryLabels={categoryLabels}
+                participantsCounts={participantsCounts}
               />
             </TabsContent>
 
