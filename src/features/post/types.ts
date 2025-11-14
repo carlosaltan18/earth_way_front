@@ -12,6 +12,7 @@ export type Post = {
     id: number;
     name: string;
     surname: string;
+    email?: string;
   };
   payload?: Post[];
 };
@@ -21,8 +22,9 @@ export type DisplayPost = {
   id: string;
   title: string;
   content: string;
-  postDate?: string;
+  postDate: string;
   authorId: string;
+  authorEmail?: string;
   authorName: string;
   images: string[];
 };
