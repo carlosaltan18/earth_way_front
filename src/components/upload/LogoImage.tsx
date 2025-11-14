@@ -46,17 +46,27 @@ export default function LogoImage({
     return (
       <div
         className={`flex items-center justify-center rounded-lg overflow-hidden ${fallbackClassName}`}
-        style={{ width: `${width}px`, height: `${height}px` }}
+        style={{ 
+          width: `${width}px`, 
+          height: `${height}px`,
+          minWidth: `${width}px`,
+          minHeight: `${height}px`,
+        }}
       >
-        <ImageIcon className="h-8 w-8 text-gray-400" />
+        <ImageIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
       </div>
     );
   }
 
   return (
     <div
-      className="relative rounded-lg overflow-hidden"
-      style={{ width: `${width}px`, height: `${height}px` }}
+      className="relative rounded-lg overflow-hidden flex-shrink-0"
+      style={{ 
+        width: `${width}px`, 
+        height: `${height}px`,
+        minWidth: `${width}px`,
+        minHeight: `${height}px`,
+      }}
     >
       <Image
         src={src || ""} // Provide a fallback empty string if src is undefined
@@ -64,7 +74,7 @@ export default function LogoImage({
         fill
         className={className}
         onError={() => setHasError(true)}
-        sizes={`${width}px`}
+        sizes={`(max-width: 640px) ${Math.min(width, 64)}px, ${width}px`}
       />
     </div>
   );

@@ -382,7 +382,7 @@ export default function MapPage() {
                     </div>
                   </div>
 
-                  {selectedPoint.type === "event" && selectedPoint.status === "active" && (
+                  {/**selectedPoint.type === "event" && selectedPoint.status === "active" && (
                     <Button className="w-full mt-4 bg-green-600 hover:bg-green-700">
                       Ver Detalles del Evento
                     </Button>
@@ -391,7 +391,7 @@ export default function MapPage() {
                     <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700">
                       Ver Detalles del Reporte
                     </Button>
-                  )}
+                  )*/}
                 </CardContent>
               </Card>
             )}

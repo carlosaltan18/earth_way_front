@@ -106,12 +106,12 @@ export default function ImageUploader({
   };
 
   return (
-    <div className="space-y-4">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <div className="space-y-3 sm:space-y-4">
+      <label className="block text-xs sm:text-sm font-medium text-gray-700">{label}</label>
 
       {/* Preview */}
       {preview && (
-        <div className="relative w-full h-40 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+        <div className="relative w-full h-32 sm:h-40 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
           <Image
             src={preview}
             alt="Preview"
@@ -121,16 +121,16 @@ export default function ImageUploader({
           <button
             onClick={handleRemoveImage}
             disabled={isUploading}
-            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full transition-colors disabled:bg-gray-400"
+            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 sm:p-1 rounded-full transition-colors disabled:bg-gray-400"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3 w-3 sm:h-4 sm:w-4" />
           </button>
 
           {/* Loading State con Preview */}
           {isUploading && (
             <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-6 w-6 text-white animate-spin" />
+              <div className="flex flex-col items-center gap-1.5 sm:gap-2">
+                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-white animate-spin" />
                 <p className="text-xs text-white">Subiendo...</p>
               </div>
             </div>
@@ -144,7 +144,7 @@ export default function ImageUploader({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          className={`relative border-2 border-dashed rounded-lg p-4 sm:p-6 md:p-8 text-center transition-colors ${
             isDragging
               ? "border-blue-500 bg-blue-50"
               : "border-gray-300 bg-gray-50 hover:border-gray-400"
@@ -158,22 +158,25 @@ export default function ImageUploader({
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
           />
 
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-1.5 sm:gap-2">
             {isUploading ? (
               <>
-                <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-                <p className="text-sm text-gray-600">Subiendo imagen...</p>
+                <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500 animate-spin" />
+                <p className="text-xs sm:text-sm text-gray-600">Subiendo imagen...</p>
               </>
             ) : (
               <>
-                <ImageIcon className="h-8 w-8 text-gray-400" />
-                <p className="text-sm font-medium text-gray-700">
+                <ImageIcon className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                <p className="text-xs sm:text-sm font-medium text-gray-700">
                   {placeholder}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 hidden sm:block">
                   Arrastra y suelta o haz clic para seleccionar
                 </p>
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="text-xs text-gray-500 sm:hidden">
+                  Toca para seleccionar
+                </p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-1 sm:mt-2">
                   Máximo 5MB • PNG, JPG, WEBP
                 </p>
               </>

@@ -169,8 +169,6 @@ export default function Navbar() {
                   <Link href="/events" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Eventos</Link>
                   <Link href="/organizations" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Organizaciones</Link>
                   <Link href="/reports" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Reportes</Link>
-                  <Link href="/map-events" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Mapa Eventos</Link>
-                  <Link href="/map-reports" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Mapa Reportes</Link>
                   {(hasRole("ROLE_ADMIN") || hasRole("ROLE_ORGANIZATION")) && (
                     <Link href="/dashboard" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600" onClick={() => setIsMenuOpen(false)}>Dashboard</Link>
                   )}

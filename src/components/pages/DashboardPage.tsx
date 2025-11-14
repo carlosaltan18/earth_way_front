@@ -874,23 +874,36 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
   return (
     <ProtectedRoute requiredRoles={["ROLE_ADMIN", "ROLE_ORGANIZATION"]}>
       <Layout>
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
           <div className="mb-4 sm:mb-6 lg:mb-8">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">Dashboard Administrativo</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-2">Panel de control para gestión de la plataforma</p>
+            <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Panel de control para gestión de la plataforma</p>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              {hasRole("ROLE_ADMIN") && <TabsTrigger value="users" className="text-sm sm:text-base">Usuarios</TabsTrigger>}
-              <TabsTrigger value="events" className="text-sm sm:text-base">Eventos</TabsTrigger>
-              <TabsTrigger value="posts" className="text-sm sm:text-base">Publicaciones</TabsTrigger>
-              {hasRole("ROLE_ADMIN") && <TabsTrigger value="organizations" className="text-sm sm:text-base">Organizaciones</TabsTrigger>}
-              <TabsTrigger value="reports" className="text-sm sm:text-base">Reportes</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-2 h-auto p-1">
+              {hasRole("ROLE_ADMIN") && (
+                <TabsTrigger value="users" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden sm:inline">Usuarios</span>
+                  <span className="sm:hidden">Users</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="events" className="text-xs sm:text-sm px-2 py-2">Eventos</TabsTrigger>
+              <TabsTrigger value="posts" className="text-xs sm:text-sm px-2 py-2">
+                <span className="hidden sm:inline">Publicaciones</span>
+                <span className="sm:hidden">Posts</span>
+              </TabsTrigger>
+              {hasRole("ROLE_ADMIN") && (
+                <TabsTrigger value="organizations" className="text-xs sm:text-sm px-2 py-2">
+                  <span className="hidden lg:inline">Organizaciones</span>
+                  <span className="lg:hidden">Orgs</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="reports" className="text-xs sm:text-sm px-2 py-2">Reportes</TabsTrigger>
             </TabsList>
 
             {hasRole("ROLE_ADMIN") && (
-              <TabsContent value="users" className="space-y-6">
+              <TabsContent value="users" className="space-y-4 sm:space-y-6">
                 <UserSection
                   users={filteredUsers}
                   userSearch={userSearch}
@@ -905,7 +918,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
               </TabsContent>
             )}
 
-            <TabsContent value="events" className="space-y-6">
+            <TabsContent value="events" className="space-y-4 sm:space-y-6">
               <EventSection
                 events={events}
                 eventSearch={eventSearch}
@@ -930,12 +943,12 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
               />
             </TabsContent>
 
-            <TabsContent value="posts" className="space-y-6">
+            <TabsContent value="posts" className="space-y-4 sm:space-y-6">
               <PostSection filteredPosts={filteredPosts} postSearch={postSearch} setPostSearch={setPostSearch} handleDeletePost={handleDeletePost} />
             </TabsContent>
 
             {hasRole("ROLE_ADMIN") && (
-              <TabsContent value="organizations" className="space-y-6">
+              <TabsContent value="organizations" className="space-y-4 sm:space-y-6">
                 <OrganizationSection
                   organizations={organizations}
                   orgSearch={orgSearch}
@@ -960,7 +973,7 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
               </TabsContent>
             )}
 
-            <TabsContent value="reports" className="space-y-6">
+            <TabsContent value="reports" className="space-y-4 sm:space-y-6">
               <ReportSection
                 reports={reports}
                 reportSearch={reportSearch}
@@ -989,27 +1002,35 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
           </Tabs>
         </div>
 
-        {/* Role Management Dialog (lo dejamos como en tu original) */}
+        {/* Role Management Dialog */}
         <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="max-w-[90vw] sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ShieldIcon className="h-5 w-5" /> Gestionar Roles de Usuario
+              <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <ShieldIcon className="h-4 w-4 sm:h-5 sm:w-5" /> Gestionar Roles de Usuario
               </DialogTitle>
-              <DialogDescription>Usuario: <strong>{selectedUser?.name}</strong></DialogDescription>
+              <DialogDescription className="text-xs sm:text-sm">
+                Usuario: <strong>{selectedUser?.name}</strong>
+              </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <Label className="text-sm font-medium mb-2 block">Roles Actuales</Label>
+                <Label className="text-xs sm:text-sm font-medium mb-2 block">Roles Actuales</Label>
                 <div className="space-y-2">
                   {selectedUser?.roles.map((role) => (
-                    <div key={role} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={role} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{role}</Badge>
+                        <Badge variant="secondary" className="text-xs">{role}</Badge>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleRemoveRole(role)} disabled={isRemovingRole || selectedUser.roles.length === 1} className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleRemoveRole(role)} 
+                        disabled={isRemovingRole || selectedUser.roles.length === 1} 
+                        className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                      >
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
                     </div>
                   ))}
@@ -1017,15 +1038,21 @@ const { data: availableRoles = [], isLoading: isLoadingRoles } = useGetRoles();
               </div>
 
               <div>
-                <Label className="text-sm font-medium mb-2 block">Agregar Rol</Label>
+                <Label className="text-xs sm:text-sm font-medium mb-2 block">Agregar Rol</Label>
                 {isLoadingRoles ? (
-                  <p className="text-sm text-gray-500">Cargando roles disponibles...</p>
+                  <p className="text-xs sm:text-sm text-gray-500">Cargando roles disponibles...</p>
                 ) : (
                   <div className="space-y-2">
                     {availableRoles
                       ?.filter((role) => !selectedUser?.roles.includes(role.name as UserRole))
                       .map((role) => (
-                        <Button key={role.id} variant="outline" className="w-full justify-start" onClick={() => handleAddRole(role.name)} disabled={isAddingRole}>
+                        <Button 
+                          key={role.id} 
+                          variant="outline" 
+                          className="w-full justify-start text-xs sm:text-sm" 
+                          onClick={() => handleAddRole(role.name)} 
+                          disabled={isAddingRole}
+                        >
                           {role.name}
                         </Button>
                       ))}
